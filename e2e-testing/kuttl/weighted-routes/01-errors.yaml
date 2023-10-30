@@ -1,0 +1,13 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app-default-dynamicenv-weighted-routes
+  namespace: weighted-routes
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: test-app-default-dynamicenv-weighted-routes
+  namespace: weighted-routes
+...

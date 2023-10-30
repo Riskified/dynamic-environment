@@ -1,0 +1,75 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: test-app-vs
+  namespace: delegate-virtual-service-2
+spec:
+  gateways:
+    - gateways/private-default-1
+    - mesh
+  hosts:
+    - test-app-service.delegate-virtual-service.svc.cluster.local
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - gateways:
+            - mesh
+      name: in-cluster-default
+      route:
+        - destination:
+            host: test-app-service.delegate-virtual-service.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100
+    - match:
+        - uri:
+            prefix: /nisan
+      delegate:
+        name: test-app-vs-delegated
+        namespace: delegate-virtual-service
+    - delegate:
+        name: does-not-exist-delegate
+        namespace: delegate-virtual-service
+      match:
+        - uri:
+            prefix: /adi
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: test-app-vs-delegated
+  namespace: delegate-virtual-service
+spec:
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - uri:
+            prefix: /haim
+      name: haim
+      route:
+        - destination:
+            host: test-app-service.delegate-virtual-service.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100

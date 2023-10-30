@@ -1,0 +1,60 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: reviews-default-dynamicenv-alternative-default-version-reviews
+  namespace: alternative-default-version
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: details
+  namespace: alternative-default-version
+spec:
+  hosts:
+    - details
+  http:
+    - match:
+        - headers:
+            end-user:
+              prefix: jason
+#      name: dynamic-environment-default-dynamicenv-alternative-default-version-details-763ad37a61
+      route:
+        - destination:
+            host: details
+            subset: default-dynamicenv-alternative-default-version
+          headers:
+            response:
+              add:
+                x-dynamic-env: details-default-dynamicenv-alternative-default-version
+    - route:
+        - destination:
+            host: details
+            subset: shared
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: alternative-default-version
+spec:
+  hosts:
+    - reviews
+  http:
+    - match:
+        - headers:
+            end-user:
+              prefix: jason
+#      name: dynamic-environment-default-dynamicenv-alternative-default-version-reviews-de08d07349
+      route:
+        - destination:
+            host: reviews
+            subset: default-dynamicenv-alternative-default-version
+          headers:
+            response:
+              add:
+                x-dynamic-env: reviews-default-dynamicenv-alternative-default-version
+    - route:
+        - destination:
+            host: reviews
+            subset: v1

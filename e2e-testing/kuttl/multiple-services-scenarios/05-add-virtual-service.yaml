@@ -1,0 +1,15 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: details-alt
+  namespace: multiple-services-per-deployment
+spec:
+  hosts:
+    - details-alt
+  http:
+    - route:
+        - destination:
+            host: details-alt
+            subset: shared
+...

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: dynamic-environment-operator
+description: Dynamic environment operator for Kubernetes
+version: 1.0.0
+appVersion: v1.0.0
+home: https://github.com/Riskified/dynamic-environment
+sources:
+  - https://github.com/Riskified/dynamic-environment
+maintainers:
+  - name: nisan270390
+    url: https://github.com/nisan270390
+    email: nisan.itzhakov@riskified.com
+  - name: babysnakes
+    url: https://github.com/babysnakes
+    email: haim.ashkenazi@riskified.com
+keywords:
+  - k8s
+  - dynamic environment

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    dynamic-env: "true"
+    version: default-dynamicenv-simple-test
+  name: details-default-dynamicenv-simple-test
+  namespace: simple-test
+spec:
+  template:
+    metadata:
+      labels:
+        dynamic-env: "true"
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-default-dynamicenv-simple-test-details
+  namespace: simple-test
+spec:
+  host: details
+  subsets:
+    - name: default-dynamicenv-simple-test
+      labels:
+        version: default-dynamicenv-simple-test
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-simple-test
+status:
+  state: ready
+  totalCount: 1
+  totalReady: 1

@@ -1,0 +1,126 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app: test-app
+  name: test-app-vs
+  namespace: weighted-routes
+spec:
+  gateways:
+  - gateways/private-default-1
+  - mesh
+  hosts:
+  - test-app-service.weighted-routes.svc.cluster.local
+  - workshop-nisan.staging.riskxint.com
+  http:
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - mesh
+    name: in-cluster-default
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /nisan
+    name: nisan
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /haim
+    name: haim
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /
+    name: default
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary

@@ -1,0 +1,15 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-reconcile-flow
+status:
+  state: degraded
+  totalCount: 1
+  totalReady: 0
+  subsetsStatus:
+    details-default-dynamicenv-reconcile-flow:
+      subsetErrors:
+        deployment:
+          - error: 'couldn''t find the deployment we need to override (name: details,
+            ns: reconcile-flow), Deployment.apps "details" not found'

@@ -1,0 +1,17 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-watch-annotations
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-default-dynamicenv-watch-annotations
+  namespace: watch-annotations
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-default-dynamicenv-watch-annotations
+  namespace: watch-annotations

@@ -1,0 +1,42 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: details
+  namespace: modify-valid-httproutes
+spec:
+  http:
+  # This match only routes to the target that matches our service host and not to both routes.
+  - match:
+    - gateways:
+      - mesh
+      headers:
+        end-user:
+          prefix: jason
+    # name: dynamic-environment-default-dynamicenv-modify-valid-httproutes-691103e5cc
+    route:
+    - destination:
+        host: details
+        subset: default-dynamicenv-modify-valid-httproutes
+  - match:
+    - gateways:
+      - mesh
+    route:
+    - destination:
+        host: details
+        subset: shared
+    - destination:
+        host: another-details
+        subset: shared
+  - match:
+    - headers:
+        end-user:
+          prefix: jason
+    # name: dynamic-environment-default-dynamicenv-modify-valid-httproutes-d0c21a3977
+    route:
+    - destination:
+        host: details
+        subset: default-dynamicenv-modify-valid-httproutes
+  - route:
+    - destination:
+        host: details
+        subset: shared

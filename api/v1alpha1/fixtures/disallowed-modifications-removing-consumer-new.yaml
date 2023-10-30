@@ -1,0 +1,20 @@
+---
+apiVersion: "riskified.com/v1alpha1"
+kind: "DynamicEnv"
+metadata:
+  name: "dynamicenv-vs-with-multiple-services"
+  namespace: "default"
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: "jason"
+  subsets:
+    - name: "details"
+      namespace: "vs-with-multiple-services"
+      containers:
+        - containerName: "details"
+          image: "alternative-image:v1"
+          env:
+            - name: "TOPIC_NAME"
+              value: "test"

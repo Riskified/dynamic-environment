@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-update-subset-resources
+  name: details-default-dynamicenv-update-subset-resources
+  namespace: update-subset-resources
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-default-dynamicenv-update-subset-resources-details
+  namespace: update-subset-resources
+spec:
+  host: details
+  subsets:
+    - name: default-dynamicenv-update-subset-resources
+      labels:
+        version: default-dynamicenv-update-subset-resources
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-update-subset-resources
+status:
+  subsetsStatus:
+    details-default-dynamicenv-update-subset-resources:
+      hash: -5576677875946656812

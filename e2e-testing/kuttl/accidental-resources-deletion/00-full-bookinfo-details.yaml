@@ -1,0 +1,376 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: accidental-resources-deletion
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: details
+  namespace: accidental-resources-deletion
+  labels:
+    app: details
+    service: details
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: details
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-details
+  namespace: accidental-resources-deletion
+  labels:
+    account: details
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details
+  namespace: accidental-resources-deletion
+  labels:
+    app: details
+    version: shared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: details
+      version: shared
+  template:
+    metadata:
+      labels:
+        app: details
+        version: shared
+    spec:
+      serviceAccountName: bookinfo-details
+      containers:
+        - name: details
+          image: docker.io/istio/examples-bookinfo-details-v1:1.16.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9080
+          securityContext:
+            runAsUser: 1000
+---
+##################################################################################################
+# Ratings service
+##################################################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: ratings
+  namespace: accidental-resources-deletion
+  labels:
+    app: ratings
+    service: ratings
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: ratings
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-ratings
+  namespace: accidental-resources-deletion
+  labels:
+    account: ratings
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ratings
+  namespace: accidental-resources-deletion
+  labels:
+    app: ratings
+    version: shared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ratings
+      version: shared
+  template:
+    metadata:
+      labels:
+        app: ratings
+        version: shared
+    spec:
+      serviceAccountName: bookinfo-ratings
+      containers:
+        - name: ratings
+          image: docker.io/istio/examples-bookinfo-ratings-v1:1.16.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9080
+          securityContext:
+            runAsUser: 1000
+---
+##################################################################################################
+# Reviews service
+##################################################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews
+  namespace: accidental-resources-deletion
+  labels:
+    app: reviews
+    service: reviews
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: reviews
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-reviews
+  namespace: accidental-resources-deletion
+  labels:
+    account: reviews
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reviews
+  namespace: accidental-resources-deletion
+  labels:
+    app: reviews
+    version: shared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reviews
+      version: shared
+  template:
+    metadata:
+      labels:
+        app: reviews
+        version: shared
+    spec:
+      serviceAccountName: bookinfo-reviews
+      containers:
+        - name: reviews
+          image: docker.io/istio/examples-bookinfo-reviews-v2:1.16.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: LOG_DIR
+              value: "/tmp/logs"
+          ports:
+            - containerPort: 9080
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: wlp-output
+              mountPath: /opt/ibm/wlp/output
+          securityContext:
+            runAsUser: 1000
+      volumes:
+        - name: wlp-output
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+##################################################################################################
+# Productpage services
+##################################################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: productpage
+  namespace: accidental-resources-deletion
+  labels:
+    app: productpage
+    service: productpage
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: productpage
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-productpage
+  namespace: accidental-resources-deletion
+  labels:
+    account: productpage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productpage
+  namespace: accidental-resources-deletion
+  labels:
+    app: productpage
+    version: shared
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: productpage
+      version: shared
+  template:
+    metadata:
+      labels:
+        app: productpage
+        version: shared
+    spec:
+      serviceAccountName: bookinfo-productpage
+      containers:
+        - name: productpage
+          image: docker.io/istio/examples-bookinfo-productpage-v1:1.16.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9080
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            runAsUser: 1000
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: productpage
+  namespace: accidental-resources-deletion
+spec:
+  host: productpage
+  subsets:
+    - name: shared
+      labels:
+        version: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: reviews
+  namespace: accidental-resources-deletion
+spec:
+  host: reviews
+  subsets:
+    - name: shared
+      labels:
+        version: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ratings
+  namespace: accidental-resources-deletion
+spec:
+  host: ratings
+  subsets:
+    - name: shared
+      labels:
+        version: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details
+  namespace: accidental-resources-deletion
+spec:
+  host: details
+  subsets:
+    - name: shared
+      labels:
+        version: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: productpage
+  namespace: accidental-resources-deletion
+spec:
+  hosts:
+    - productpage
+  http:
+    - route:
+        - destination:
+            host: productpage
+            subset: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: accidental-resources-deletion
+spec:
+  hosts:
+    - reviews
+  http:
+    - route:
+        - destination:
+            host: reviews
+            subset: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ratings
+  namespace: accidental-resources-deletion
+spec:
+  hosts:
+    - ratings
+  http:
+    - route:
+        - destination:
+            host: ratings
+            subset: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: details
+  namespace: accidental-resources-deletion
+spec:
+  hosts:
+    - details
+  http:
+    - route:
+        - destination:
+            host: details
+            subset: shared
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-accidental-resources-deletion
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: "details"
+      namespace: "accidental-resources-deletion"
+      containers:
+        - containerName: details
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+          env:
+            - name: TOPIC_NAME
+              value: test
+    - name: "reviews"
+      namespace: "accidental-resources-deletion"
+      containers:
+        - containerName: reviews
+          command: ["/opt/ibm/wlp/bin/server", "run", "defaultServer"]
+          image: docker.io/istio/examples-bookinfo-reviews-v3:1.16.2
+          env:
+            - name: TOPIC_NAME
+              value: test

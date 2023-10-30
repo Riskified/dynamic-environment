@@ -1,0 +1,181 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: delegate-virtual-service
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: delegate-virtual-service-2
+  labels:
+    istio-injection: enabled
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+  labels:
+    app: test-app
+    version: shared
+  name: test-app
+  namespace: delegate-virtual-service
+spec:
+  progressDeadlineSeconds: 1200
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-app
+      version: shared
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: test-app
+        app.kubernetes.io/instance: test-app
+        version: shared
+    spec:
+      containers:
+        - image: willejs/go-hello-world
+          imagePullPolicy: IfNotPresent
+          name: server
+          ports:
+            - containerPort: 5000
+              name: http
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: test-app
+    purpose: main
+  name: test-app-service
+  namespace: delegate-virtual-service
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 5000
+  selector:
+    app: test-app
+  type: ClusterIP
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  labels:
+    app: test-app
+  name: test-app
+  namespace: delegate-virtual-service
+spec:
+  host: test-app-service.delegate-virtual-service.svc.cluster.local
+  subsets:
+    - labels:
+        version: shared
+      name: shared
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app: test-app
+  name: test-app-vs
+  namespace: delegate-virtual-service-2
+spec:
+  gateways:
+    - gateways/private-default-1
+    - mesh
+  hosts:
+    - test-app-service.delegate-virtual-service.svc.cluster.local
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - gateways:
+            - mesh
+      name: in-cluster-default
+      route:
+        - destination:
+            host: test-app-service.delegate-virtual-service.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100
+    - match:
+        - uri:
+            prefix: /nisan
+      delegate:
+        name: test-app-vs-delegated
+        namespace: delegate-virtual-service
+    - match:
+        - uri:
+            prefix: /adi
+      delegate:
+        name: does-not-exist-delegate
+        namespace: delegate-virtual-service
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app: test-app
+  name: test-app-vs-delegated
+  namespace: delegate-virtual-service
+spec:
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - uri:
+            prefix: /haim
+      name: haim
+      route:
+        - destination:
+            host: test-app-service.delegate-virtual-service.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-delegate-virtual-service
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: test-app
+      namespace: delegate-virtual-service
+      containers:
+        - containerName: server
+          env:
+            - name: TOPIC_NAME
+              value: test

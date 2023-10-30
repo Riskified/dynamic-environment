@@ -1,0 +1,38 @@
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-sample
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          exact: jason
+    - sourceLabels:
+        a-label: a-value
+  subsets:
+    - name: "details"
+      namespace: "services"
+      containers:
+      - containerName: details
+        image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+        env:
+          - name: TOPIC_NAME
+            value: test
+    - name: reviews
+      namespace: services
+      containers:
+      - containerName: reviews
+        command: ["/opt/ibm/wlp/bin/server", "run", "defaultServer"]
+        image: docker.io/istio/examples-bookinfo-reviews-v3:1.16.2
+        env:
+          - name: TOPIC_NAME
+            value: test
+  consumers:
+    - name: "details-worker"
+      namespace: "services"
+      containers:
+      - containerName: details
+        image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+        env:
+          - name: TOPIC_NAME
+            value: test-worker
