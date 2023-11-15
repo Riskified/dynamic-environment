@@ -185,7 +185,6 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
-LOCAL_CLI ?= $(shell pwd)/cmd/dectl
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
@@ -303,11 +302,3 @@ crd-ref: ## Generate CRD reference documentation
 .PHONY: helm-crd
 helm-crd: manifests ## Generate helm CRD
 	$(KUSTOMIZE) build config/crd > helm/dynamic-environment/templates/crd.yaml
-
-.PHONY: cli-build
-cli-build: ## Build the cli
-	go build -o $(LOCALBIN)/dectl -ldflags="-X 'github.com/riskified/dynamic-environment/cmd/dectl.version=0.0.1'" $(LOCAL_CLI)/main.go
-
-.PHONY: cli-tests
-cli-tests: ## Run the cli tests
-	go test $(LOCAL_CLI)/client/...
