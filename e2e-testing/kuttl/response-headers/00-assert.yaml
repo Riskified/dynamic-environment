@@ -1,0 +1,137 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: test-app-vs
+  namespace: response-headers-2
+spec:
+  hosts:
+    - test-app-service.response-headers.svc.cluster.local
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - gateways:
+            - mesh
+          headers:
+            end-user:
+              prefix: jason
+#      name: dynamic-environment-default-dynamicenv-response-headers-test-app-eab8f3914d
+      route:
+        - destination:
+            host: test-app-service.response-headers.svc.cluster.local
+            port:
+              number: 80
+            subset: default-dynamicenv-response-headers
+          headers:
+            response:
+              add:
+                x-dynamic-env: test-app-default-dynamicenv-response-headers
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - gateways:
+            - mesh
+      name: in-cluster-default
+      route:
+        - destination:
+            host: test-app-service.response-headers.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100
+    - delegate:
+        name: test-app-vs-delegated
+        namespace: response-headers
+      match:
+        - uri:
+            prefix: /nisan
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: test-app-vs-delegated
+  namespace: response-headers
+spec:
+  http:
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - headers:
+            end-user:
+              prefix: jason
+          uri:
+            prefix: /haim
+#      name: dynamic-environment-default-dynamicenv-response-headers-test-app-d559661c4d
+      route:
+        - destination:
+            host: test-app-service.response-headers.svc.cluster.local
+            port:
+              number: 80
+            subset: default-dynamicenv-response-headers
+          headers:
+            response:
+              add:
+                x-dynamic-env: test-app-default-dynamicenv-response-headers
+    - headers:
+        request:
+          add:
+            x-request-start: t=%START_TIME(%s.%3f)%
+          set:
+            X-FORWARDED-PROTO: https
+        response:
+          remove:
+            - x-envoy-upstream-healthchecked-cluster
+            - x-envoy-upstream-service-time
+      match:
+        - uri:
+            prefix: /haim
+      name: haim
+      route:
+        - destination:
+            host: test-app-service.response-headers.svc.cluster.local
+            port:
+              number: 80
+            subset: shared
+          weight: 100
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-response-headers
+  namespace: default
+status:
+  subsetsStatus:
+    test-app-default-dynamicenv-response-headers:
+      virtualServices:
+        - name: test-app-vs
+          namespace: response-headers-2
+          status: running
+        - name: test-app-vs-delegated
+          namespace: response-headers
+          status: running
+...

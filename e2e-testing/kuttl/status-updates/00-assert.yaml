@@ -1,0 +1,23 @@
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-status-updates
+  namespace: default
+status:
+  state: ready
+  totalCount: 1
+  totalReady: 1
+  subsetsStatus:
+    details-default-dynamicenv-status-updates:
+      deployment:
+        name: details-default-dynamicenv-status-updates
+        namespace: status-updates
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-status-updates-details
+          namespace: status-updates
+          status: running
+      virtualServices:
+        - name: details
+          namespace: status-updates
+          status: running

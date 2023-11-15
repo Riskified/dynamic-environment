@@ -1,0 +1,31 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-multiple-services-per-deployment
+  namespace: default
+status:
+  state: ready
+  subsetsStatus:
+    details-default-dynamicenv-multiple-services-per-deploym:
+      deployment:
+        name: details-default-dynamicenv-multiple-services-per-deploym
+        namespace: multiple-services-per-deployment
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-multiple-services-per-deploym-details
+          namespace: multiple-services-per-deployment
+          status: running
+        - name: details-default-dynamicenv-multiple-services-per-deploym-details-alt
+          namespace: multiple-services-per-deployment
+          status: running
+      virtualServices:
+        - name: details
+          namespace: multiple-services-per-deployment
+          status: running
+        - name: details-alt
+          namespace: multiple-services-per-deployment
+          status: running
+  totalCount: 1
+  totalReady: 1
+...

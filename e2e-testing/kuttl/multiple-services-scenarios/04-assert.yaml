@@ -1,0 +1,31 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-multiple-services-per-deployment
+  namespace: default
+status:
+  state: degraded
+  subsetsStatus:
+    details-default-dynamicenv-multiple-services-per-deploym:
+      deployment:
+        name: details-default-dynamicenv-multiple-services-per-deploym
+        namespace: multiple-services-per-deployment
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-multiple-services-per-deploym-details
+          namespace: multiple-services-per-deployment
+          status: ignored-missing-destination-rule
+        - name: details-default-dynamicenv-multiple-services-per-deploym-details-alt
+          namespace: multiple-services-per-deployment
+          status: ignored-missing-destination-rule
+#      virtualServices:
+#        - name: details
+#          namespace: multiple-services-per-deployment
+#          status: running
+      subsetErrors:
+        destinationRule:
+          - error: 'no base destination rules were found for subset: details-default-dynamicenv-multiple-services-per-deploym'
+  totalCount: 1
+  totalReady: 1
+...

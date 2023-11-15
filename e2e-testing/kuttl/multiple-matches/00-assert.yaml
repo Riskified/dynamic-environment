@@ -1,0 +1,47 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: details
+  namespace: multiple-matches
+spec:
+  http:
+    - match:
+        - headers:
+            end-user:
+              prefix: jason
+#      name: dynamic-environment-default-dynamicenv-multiple-matches-details-1cf517baac
+      route:
+        - destination:
+            host: details
+            subset: default-dynamicenv-multiple-matches
+          headers:
+            response:
+              add:
+                x-dynamic-env: details-default-dynamicenv-multiple-matches
+    - match:
+        - sourceLabels:
+            end-user: json
+#      name: dynamic-environment-default-dynamicenv-multiple-matches-details-5ad8be9618
+      route:
+        - destination:
+            host: details
+            subset: default-dynamicenv-multiple-matches
+          headers:
+            response:
+              add:
+                x-dynamic-env: details-default-dynamicenv-multiple-matches
+    - route:
+        - destination:
+            host: details
+            subset: shared
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-default-dynamicenv-multiple-matches
+  namespace: multiple-matches
+spec:
+  template:
+    metadata:
+      labels:
+        x-key: x-value

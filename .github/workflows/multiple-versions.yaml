@@ -1,0 +1,21 @@
+name: multiple-versions
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  kuttl:
+    strategy:
+      matrix:
+        versions:
+          - kind_image: "kindest/node:v1.25.3"
+            istio: "1.16.2"
+          - kind_image: "kindest/node:v1.23.13"
+            istio: "1.14.6"
+          - kind_image: "kindest/node:v1.21.10"
+            istio: "1.12.2"
+    uses: ./.github/workflows/kuttl_workflow.yaml
+    with:
+      istio_ver: ${{ matrix.versions.istio }}
+      kind_image: ${{ matrix.versions.kind_image }}

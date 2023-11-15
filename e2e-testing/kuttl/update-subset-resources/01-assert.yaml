@@ -1,0 +1,28 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-default-dynamicenv-update-subset-resources
+  namespace: update-subset-resources
+spec:
+  template:
+    spec:
+      containers:
+        - image: docker.io/istio/examples-bookinfo-details-v2:1.16.3
+          env:
+            - name: TOPIC_NAME
+              value: test2
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-update-subset-resources
+status:
+  subsetsStatus:
+    details-default-dynamicenv-update-subset-resources:
+      hash: 3856039101763933687
+      deployment:
+        name: details-default-dynamicenv-update-subset-resources
+        namespace: update-subset-resources
+        status: running
+...

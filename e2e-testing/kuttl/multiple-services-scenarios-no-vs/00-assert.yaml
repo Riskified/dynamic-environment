@@ -1,0 +1,28 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-multiple-services-scenarios-no-vs
+  namespace: default
+status:
+  state: degraded
+  subsetsStatus:
+    details-default-dynamicenv-multiple-services-scenarios-n:
+      deployment:
+        name: details-default-dynamicenv-multiple-services-scenarios-n
+        namespace: multiple-services-scenarios-no-vs
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-multiple-services-scenarios-n-details
+          namespace: multiple-services-scenarios-no-vs
+          status: running
+        - name: details-default-dynamicenv-multiple-services-scenarios-n-details-alt
+          namespace: multiple-services-scenarios-no-vs
+          status: running
+      subsetErrors:
+        virtualServices:
+        - error: 'error updating virtual service for subset (details-default-dynamicenv-multiple-services-scenarios-n):
+            could not find even one virtual service that handles subset "details-default-dynamicenv-multiple-services-scenarios-n"'
+  totalCount: 1
+  totalReady: 0
+...

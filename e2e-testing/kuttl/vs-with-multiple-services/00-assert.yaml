@@ -1,0 +1,77 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: all-services
+  namespace: vs-with-multiple-services
+spec:
+  hosts:
+    - details
+    - reviews
+    - ratings
+    - productpage
+  http:
+    - match:
+        - headers:
+            end-user:
+              prefix: jason
+          uri:
+            exact: /details
+#      name: dynamic-environment-default-dynamicenv-vs-with-multiple-services-details-...
+      route:
+        - destination:
+            host: details
+            subset: default-dynamicenv-vs-with-multiple-services
+    - match:
+      - uri:
+          exact: /details
+      route:
+        - destination:
+            host: details
+            subset: shared
+    - match:
+        - headers:
+            end-user:
+              prefix: jason
+          uri:
+            exact: /reviews
+      #      name: dynamic-environment-default-dynamicenv-vs-with-multiple-services-reviews-...
+      route:
+        - destination:
+            host: reviews
+            subset: default-dynamicenv-vs-with-multiple-services
+    - match:
+        - uri:
+            exact: /reviews
+      route:
+        - destination:
+            host: reviews
+            subset: shared
+    - match:
+        - uri:
+            exact: /ratings
+      route:
+        - destination:
+            host: ratings
+            subset: shared
+    - match:
+        - uri:
+            exact: /productpage
+      route:
+        - destination:
+            host: productpage
+            subset: shared
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-vs-with-multiple-services
+  namespace: default
+status:
+  subsetsStatus:
+    details-default-dynamicenv-vs-with-multiple-services:
+      virtualServices:
+        - name: all-services
+          namespace: vs-with-multiple-services
+          status: running
+...

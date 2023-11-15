@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Build &amp; Run" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="dynamic-environment" />
+    <working_directory value="$PROJECT_DIR$" />
+    <envs>
+      <env name="ENABLE_WEBHOOKS" value="false" />
+    </envs>
+    <kind value="FILE" />
+    <package value="$PROJECT_DIR$/main.go" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

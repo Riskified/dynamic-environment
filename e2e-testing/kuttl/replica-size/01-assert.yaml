@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-replica-size
+  name: details-default-dynamicenv-replica-size
+  namespace: replica-size
+status:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-replica-size
+  name: details-worker-default-dynamicenv-replica-size
+  namespace: replica-size
+status:
+  replicas: 2
+---

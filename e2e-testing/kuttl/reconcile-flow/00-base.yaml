@@ -1,0 +1,16 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-reconcile-flow
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: details
+      namespace: reconcile-flow
+      containers:
+        - containerName: details
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2

@@ -1,0 +1,46 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-multiple-services-scenarios-no-working-single-host
+  namespace: default
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - containers:
+        - containerName: details
+          env:
+            - name: TOPIC_NAME
+              value: test
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+      name: details
+      namespace: multiple-services-scenarios-no-working-single-host
+status:
+  state: degraded
+  subsetsStatus:
+    details-default-dynamicenv-multiple-services-scenarios-n:
+      deployment:
+        name: details-default-dynamicenv-multiple-services-scenarios-n
+        namespace: multiple-services-scenarios-no-working-single-host
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-multiple-services-scenarios-n-details
+          namespace: multiple-services-scenarios-no-working-single-host
+          status: ignored-missing-destination-rule
+        - name: details-default-dynamicenv-multiple-services-scenarios-n-details-alt
+          namespace: multiple-services-scenarios-no-working-single-host
+          status: running
+      subsetErrors:
+        subset:
+          - error: Couldn't find common active service hostname across DestinationRules
+              and VirtualServices
+      virtualServices:
+        - name: details
+          namespace: multiple-services-scenarios-no-working-single-host
+          status: running
+  totalCount: 1
+  totalReady: 0
+...

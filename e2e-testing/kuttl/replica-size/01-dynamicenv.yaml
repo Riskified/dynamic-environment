@@ -1,0 +1,30 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-replica-size
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: details
+      namespace: replica-size
+      containers:
+      - containerName: details
+        image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+        env:
+          - name: TOPIC_NAME
+            value: test
+  consumers:
+    - name: details-worker
+      namespace: replica-size
+      replicas: 2
+      containers:
+      - containerName: details
+        image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+        env:
+          - name: TOPIC_NAME
+            value: test-worker
+...

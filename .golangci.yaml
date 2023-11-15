@@ -1,0 +1,18 @@
+# Our default golangci-lint configuration
+# If these linters fail then it should fail the build.
+run:
+  timeout: 5m
+linters:
+  disable-all: true
+  # these are the default list of enabled
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+  presets:
+    - bugs
+    - unused

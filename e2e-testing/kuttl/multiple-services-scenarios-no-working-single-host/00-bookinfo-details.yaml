@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: multiple-services-scenarios-no-working-single-host
+  labels:
+    istio-injection: enabled
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: details
+  namespace: multiple-services-scenarios-no-working-single-host
+  labels:
+    app: details
+    service: details
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: details
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: details-alt
+  namespace: multiple-services-scenarios-no-working-single-host
+  labels:
+    app: details
+    service: details
+spec:
+  ports:
+    - port: 9081
+      name: http
+  selector:
+    app: details
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bookinfo-details
+  namespace: multiple-services-scenarios-no-working-single-host
+  labels:
+    account: details
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details
+  namespace: multiple-services-scenarios-no-working-single-host
+  labels:
+    app: details
+    version: shared
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: details
+      version: shared
+  template:
+    metadata:
+      labels:
+        app: details
+        version: shared
+    spec:
+      serviceAccountName: bookinfo-details
+      containers:
+        - name: details
+          image: docker.io/istio/examples-bookinfo-details-v1:1.16.2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9080
+          securityContext:
+            runAsUser: 1000
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-alt
+  namespace: multiple-services-scenarios-no-working-single-host
+spec:
+  host: details-alt
+  subsets:
+    - name: shared
+      labels:
+        version: shared
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: details
+  namespace: multiple-services-scenarios-no-working-single-host
+spec:
+  hosts:
+    - details
+  http:
+    - route:
+        - destination:
+            host: details
+            subset: shared
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-multiple-services-scenarios-no-working-single-host
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: details
+      namespace: multiple-services-scenarios-no-working-single-host
+      containers:
+        - containerName: details
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+          env:
+            - name: TOPIC_NAME
+              value: test
+...

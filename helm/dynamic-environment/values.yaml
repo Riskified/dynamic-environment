@@ -1,0 +1,116 @@
+# Default values for dynamic-environment-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 1
+
+# podDisruptionBudget specifies the disruption budget for the controller pods.
+# Disruption budget will be configured only when the replicaCount is greater than 1
+podDisruptionBudget: {}
+#  maxUnavailable: 1
+
+image:
+  repository: localhost:32000/controller
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+podLabels: {}
+podAnnotations: {}
+
+# Invocation overrides
+command:
+  # Specify a version label other than the default 'version' (to identify DestinationRule version)
+  defaultVersionLabel: "version"
+  # Specify a default version other than the default 'shared'. This version will be used when searching default
+  # DestinationRule. Could be specified per subset in the CR.
+  defaultVersion: "shared"
+
+# Labels to be deleted form deployments when duplicating (e.g. labels that connect deployment to argocd app):
+labelsToRemove: []
+
+rbac:
+  # Specifies whether rbac resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+
+# Specifies the dnsPolicy that should be used for pods in the deployment
+#
+# This may need to be used to be changed given certain conditions. For instance, if one uses the cilium CNI
+# with certain settings, one may need to set `hostNetwork: true` and webhooks won't work unless `dnsPolicy`
+# is set to `ClusterFirstWithHostNet`. See https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+dnsPolicy: ClusterFirst
+
+# Liveness probe configuration for the controller
+livenessProbe:
+  failureThreshold: 2
+  httpGet:
+    path: /healthz
+    port: 8081
+  initialDelaySeconds: 15
+  timeoutSeconds: 20
+
+# Readiness probe configuration for the controller
+readinessProbe:
+  failureThreshold: 1
+  httpGet:
+    path: /readyz
+    port: 8081
+  initialDelaySeconds: 5
+  timeoutSeconds: 10
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 100Mi
+  requests:
+    cpu: 100m
+    memory: 20Mi
+
+# Time period for the controller pod to do a graceful shutdown
+terminationGracePeriodSeconds: 10
+
+# The address the metric endpoint binds to. (default ":8080")
+metricsBindAddr: ""
+
+# Enable cert-manager
+enableCertManager: false
+
+# webhookTLS specifies TLS cert/key for the webhook
+webhookTLS:
+  caCert:
+  cert:
+  key:
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# priorityClassName specifies the PriorityClass to indicate the importance of controller pods
+# ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass
+priorityClassName: ""

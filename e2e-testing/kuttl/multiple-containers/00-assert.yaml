@@ -1,0 +1,26 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-default-dynamicenv-multiple-containers
+  namespace: multiple-containers
+spec:
+  template:
+    spec:
+      containers:
+        - name: details
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+          ports:
+            - containerPort: 9080
+          env:
+            - name: MYENV
+              value: main
+            - name: TOPIC_NAME
+              value: test
+        - name: details-sidecar
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+          env:
+            - name: MYENV
+              value: sidecar
+            - name: TOPIC_NAME
+              value: test

@@ -1,0 +1,276 @@
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  annotations:
+    riskified.com/dynamic-environment: default/dynamicenv-weighted-routes
+  labels:
+    app: test-app
+  name: test-app-vs
+  namespace: weighted-routes
+spec:
+  gateways:
+  - gateways/private-default-1
+  - mesh
+  hosts:
+  - test-app-service.weighted-routes.svc.cluster.local
+  - workshop-nisan.staging.riskxint.com
+  http:
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - mesh
+      headers:
+        end-user:
+          prefix: jason
+    # name: dynamic-environment-default-dynamicenv-weighted-routes-a205bdfcab
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: default-dynamicenv-weighted-routes
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - mesh
+    name: in-cluster-default
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      headers:
+        end-user:
+          prefix: jason
+      uri:
+        prefix: /nisan
+    # name: dynamic-environment-default-dynamicenv-weighted-routes-a3918d5502
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: default-dynamicenv-weighted-routes
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /nisan
+    name: nisan
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      headers:
+        end-user:
+          prefix: jason
+      uri:
+        prefix: /haim
+    # name: dynamic-environment-default-dynamicenv-weighted-routes-c003a3d137
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: default-dynamicenv-weighted-routes
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /haim
+    name: haim
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      headers:
+        end-user:
+          prefix: jason
+      uri:
+        prefix: /
+    # name: dynamic-environment-default-dynamicenv-weighted-routes-c413deda5d
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: default-dynamicenv-weighted-routes
+  - headers:
+      request:
+        add:
+          x-request-start: t=%START_TIME(%s.%3f)%
+        set:
+          X-FORWARDED-PROTO: https
+      response:
+        remove:
+        - x-envoy-upstream-healthchecked-cluster
+        - x-envoy-upstream-service-time
+    match:
+    - gateways:
+      - gateways/private-default-1
+      uri:
+        prefix: /
+    name: default
+    route:
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: shared
+      weight: 100
+    - destination:
+        host: test-app-service.weighted-routes.svc.cluster.local
+        port:
+          number: 80
+        subset: canary
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: test-app
+    version: default-dynamicenv-weighted-routes
+  name: test-app-default-dynamicenv-weighted-routes
+  namespace: weighted-routes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-app
+      version: default-dynamicenv-weighted-routes
+  template:
+    metadata:
+      labels:
+        app: test-app
+        app.kubernetes.io/instance: test-app
+        version: default-dynamicenv-weighted-routes
+    spec:
+      containers:
+      - env:
+        - name: TOPIC_NAME
+          value: test
+        image: willejs/go-hello-world
+        imagePullPolicy: IfNotPresent
+        name: server
+        ports:
+        - containerPort: 5000
+          name: http
+          protocol: TCP
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  labels:
+    version: default-dynamicenv-weighted-routes
+  name: test-app-default-dynamicenv-weighted-routes-test-app-service
+  namespace: weighted-routes
+spec:
+  host: test-app-service.weighted-routes.svc.cluster.local
+  subsets:
+  - labels:
+      version: default-dynamicenv-weighted-routes
+    name: default-dynamicenv-weighted-routes
+...

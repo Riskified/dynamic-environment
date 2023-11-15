@@ -1,0 +1,20 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    prometheus: kube-prometheus
+    {{- include "dynamic-environment-operator.selectorLabels" . | nindent 4 }}
+  name: {{ include "dynamic-environment-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+    - path: /metrics
+      port: metrics-server
+      interval: 60s
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "dynamic-environment-operator.selectorLabels" . | nindent 6 }}
