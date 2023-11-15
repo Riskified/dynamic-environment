@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="TestAPIs in github.com/riskified/dynamic-environment/pkg/handlers" type="GoTestRunConfiguration" factoryName="Go Test" nameIsGenerated="true">
+    <module name="dynamic-environment" />
+    <working_directory value="$PROJECT_DIR$/pkg/handlers" />
+    <root_directory value="$PROJECT_DIR$" />
+    <kind value="PACKAGE" />
+    <package value="github.com/riskified/dynamic-environment/pkg/handlers" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <framework value="gotest" />
+    <pattern value="^\QTestAPIs\E$" />
+    <method v="2" />
+  </configuration>
+</component>

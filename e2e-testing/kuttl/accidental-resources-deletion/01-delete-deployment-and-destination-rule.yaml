@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+  - apiVersion: apps/v1
+    kind: Deployment
+    name: details-default-accidental-resources-deletion
+    namespace: accidental-resources-deletion
+  - apiVersion: networking.istio.io/v1alpha3
+    kind: DestinationRule
+    name: reviews
+    namespace: accidental-resources-deletion

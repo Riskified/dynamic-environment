@@ -1,0 +1,8 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+  - apiVersion: networking.istio.io/v1alpha3
+    kind: DestinationRule
+    name: details-default-dynamicenv-multiple-services-per-deploym-details
+    namespace: multiple-services-per-deployment

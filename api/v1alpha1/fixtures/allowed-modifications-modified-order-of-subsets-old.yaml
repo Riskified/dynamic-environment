@@ -1,0 +1,23 @@
+---
+apiVersion: "riskified.com/v1alpha1"
+kind: "DynamicEnv"
+metadata:
+  name: "dynamicenv-vs-with-multiple-services"
+  namespace: "default"
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: "jason"
+  subsets:
+    - name: "details"
+      namespace: "vs-with-multiple-services"
+      defaultVersion: "shared"
+      containers:
+        - containerName: "details"
+          image: "docker.io/istio/examples-bookinfo-details-v2:1.16.2"
+    - name: "reviews"
+      namespace: "vs-with-multiple-services"
+      containers:
+        - containerName: "reviews"
+          image: "docker.io/istio/examples-bookinfo-reviews-v3:1.16.2"

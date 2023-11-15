@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-replica-size
+  name: details-default-dynamicenv-replica-size
+  namespace: replica-size
+status:
+  replicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-replica-size
+  name: details-worker-default-dynamicenv-replica-size
+  namespace: replica-size
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-default-dynamicenv-replica-size-details
+  namespace: replica-size
+spec:
+  host: details
+  subsets:
+    - name: default-dynamicenv-replica-size
+      labels:
+        version: default-dynamicenv-replica-size

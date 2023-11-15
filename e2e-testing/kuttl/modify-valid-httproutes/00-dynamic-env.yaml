@@ -1,0 +1,19 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-modify-valid-httproutes
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: "details"
+      namespace: "modify-valid-httproutes"
+      containers:
+        - containerName: details
+          image: docker.io/istio/examples-bookinfo-details-v2:1.16.2
+          env:
+            - name: TOPIC_NAME
+              value: test

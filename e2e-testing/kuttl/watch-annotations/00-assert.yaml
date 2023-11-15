@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    riskified.com/dynamic-environment: "default/dynamicenv-watch-annotations"
+  labels:
+    app: details
+    version: default-dynamicenv-watch-annotations
+  name: details-default-dynamicenv-watch-annotations
+  namespace: watch-annotations
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  annotations:
+    riskified.com/dynamic-environment: "default/dynamicenv-watch-annotations"
+  name: details-default-dynamicenv-watch-annotations-details
+  namespace: watch-annotations
+spec:
+  host: details
+  subsets:
+    - name: default-dynamicenv-watch-annotations
+      labels:
+        version: default-dynamicenv-watch-annotations
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: details
+  namespace: watch-annotations
+  annotations:
+    riskified.com/dynamic-environment: "default/dynamicenv-watch-annotations"

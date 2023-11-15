@@ -1,0 +1,7 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-worker-default-dynamicenv-consumers-with-and-without-er
+  namespace: consumers-with-and-without-errors
+...

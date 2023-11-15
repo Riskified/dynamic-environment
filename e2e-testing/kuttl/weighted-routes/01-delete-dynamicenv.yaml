@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+  - apiVersion: riskified.com/v1alpha1
+    kind: DynamicEnv
+    name: dynamicenv-weighted-routes
+    namespace: default

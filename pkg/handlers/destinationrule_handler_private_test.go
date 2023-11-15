@@ -1,0 +1,65 @@
+package handlers
+
+// IMPORTANT: While it's generally bad practice to test private functions, I do it here in order to
+// avoid overly specified tests from the outside. If these test fails (e.g. we changed
+// implementation) just delete the failing tests (of-course, make sure you test the new
+// functionality :) ).
+
+import (
+	"context"
+	"github.com/go-logr/logr"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	istioapi "istio.io/api/networking/v1alpha3"
+	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var _ = Describe("Accepting alternative version label and version", func() {
+	It("Handles custom version label correctly", func() {
+		versionLabel := "version-label"
+		version := "custom-version-value"
+		mc := struct{ MockClient }{}
+		serviceName := "service-name"
+		mc.listMethod = func(_ context.Context, drs client.ObjectList, _ ...client.ListOption) error {
+			drs.(*istionetwork.DestinationRuleList).Items = []*istionetwork.DestinationRule{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "service",
+						Namespace: "namespace",
+					},
+					Spec: istioapi.DestinationRule{
+						Host: serviceName,
+						Subsets: []*istioapi.Subset{
+							{
+								Name: versionLabel,
+								Labels: map[string]string{
+									versionLabel: version,
+								},
+							},
+						},
+					},
+				},
+			}
+			return nil
+		}
+		h := DestinationRuleHandler{
+			Client:         mc,
+			UniqueName:     "unique-name",
+			UniqueVersion:  "unique-version",
+			Namespace:      "namespace",
+			VersionLabel:   versionLabel,
+			DefaultVersion: version,
+			StatusHandler:  nil,
+			ServiceHosts:   []string{serviceName},
+			Owner:          types.NamespacedName{},
+			Log:            logr.Logger{},
+			Ctx:            nil,
+		}
+		dr, err := h.generateOverridingDestinationRule(serviceName)
+		Expect(err).To(BeNil())
+		Expect(dr).NotTo(BeNil())
+	})
+})

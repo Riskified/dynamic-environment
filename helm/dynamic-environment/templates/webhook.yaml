@@ -1,0 +1,74 @@
+{{ $tls := fromYaml ( include "dynamic-environment-operator.webhookCerts" . ) }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+{{- if $.Values.enableCertManager }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "dynamic-environment-operator.namePrefix" . }}-serving-cert
+{{- end }}
+  name: {{ include "dynamic-environment-operator.namePrefix" . }}-webhook
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: {{ if not $.Values.enableCertManager -}}{{ $tls.caCert }}{{- else -}}Cg=={{ end }}
+    service:
+      name: {{ template "dynamic-environment-operator.webhookService" . }}
+      namespace: {{ $.Release.Namespace }}
+      path: /validate-riskified-com-v1alpha1-dynamicenv
+  failurePolicy: Fail
+  name: vdynamicenv.kb.io
+  rules:
+  - apiGroups:
+    - riskified.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dynamicenvs
+  sideEffects: None
+---
+{{- if not $.Values.enableCertManager }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "dynamic-environment-operator.webhookCertSecret" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+{{ include "dynamic-environment-operator.labels" . | indent 4 }}
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ $tls.caCert }}
+  tls.crt: {{ $tls.clientCert }}
+  tls.key: {{ $tls.clientKey }}
+{{- else }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "dynamic-environment-operator.namePrefix" . }}-serving-cert
+  namespace: {{ .Release.Namespace }}
+  labels:
+{{ include "dynamic-environment-operator.labels" . | indent 4 }}
+spec:
+  dnsNames:
+  - {{ template "dynamic-environment-operator.webhookService" . }}.{{ .Release.Namespace }}
+  - {{ template "dynamic-environment-operator.webhookService" . }}.{{ .Release.Namespace }}.svc
+  - {{ template "dynamic-environment-operator.webhookService" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ template "dynamic-environment-operator.namePrefix" . }}-selfsigned-issuer
+  secretName: {{ template "dynamic-environment-operator.webhookCertSecret" . }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "dynamic-environment-operator.namePrefix" . }}-selfsigned-issuer
+  namespace: {{ .Release.Namespace }}
+  labels:
+{{ include "dynamic-environment-operator.labels" . | indent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}

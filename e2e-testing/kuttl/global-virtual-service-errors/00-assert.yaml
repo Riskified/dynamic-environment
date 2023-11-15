@@ -1,0 +1,17 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-global-virtual-service-errors
+  namespace: default
+status:
+  state: degraded
+  totalCount: 1
+  totalReady: 0
+  subsetsStatus:
+    details-default-dynamicenv-global-virtual-service-errors:
+      subsetErrors:
+        virtualServices:
+          - error: 'error updating virtual service for subset (details-default-dynamicenv-global-virtual-service-errors):
+                     could not find even one virtual service that handles subset "details-default-dynamicenv-global-virtual-service-errors"'
+...

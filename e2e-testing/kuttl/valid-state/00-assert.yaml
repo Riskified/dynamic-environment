@@ -1,0 +1,16 @@
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-valid-state
+status:
+  subsetsStatus:
+    details-default-dynamicenv-valid-state:
+      deployment:
+        name: details-default-dynamicenv-valid-state
+        namespace: valid-state
+      destinationRules:
+        - name: details-default-dynamicenv-valid-state-details
+          namespace: valid-state
+      virtualServices:
+        - name: details
+          namespace: valid-state

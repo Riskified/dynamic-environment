@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: details
+    version: default-dynamicenv-accidental-resources-deletion
+  name: details-default-dynamicenv-accidental-resources-deletion
+  namespace: accidental-resources-deletion
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: details-default-dynamicenv-accidental-resources-deletion-details
+  namespace: accidental-resources-deletion
+spec:
+  host: details
+  subsets:
+    - name: default-dynamicenv-accidental-resources-deletion
+      labels:
+        version: default-dynamicenv-accidental-resources-deletion
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: reviews
+    version: default-dynamicenv-accidental-resources-deletion
+  name: reviews-default-dynamicenv-accidental-resources-deletion
+  namespace: accidental-resources-deletion
+status:
+  replicas: 1
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: reviews-default-dynamicenv-accidental-resources-deletion-reviews
+  namespace: accidental-resources-deletion
+spec:
+  host: reviews
+  subsets:
+    - name: default-dynamicenv-accidental-resources-deletion
+      labels:
+        version: default-dynamicenv-accidental-resources-deletion

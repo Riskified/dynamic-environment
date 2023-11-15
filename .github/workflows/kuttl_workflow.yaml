@@ -1,0 +1,59 @@
+name: kuttl_workflow
+on:
+  workflow_call:
+    inputs:
+      istio_ver:
+        required: true
+        type: string
+      kind_image:
+        required: true
+        type: string
+
+jobs:
+  kuttl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Versions from .tool-versions
+        uses: endorama/asdf-parse-tool-versions@v1
+        id: versions
+      - name: Install asdf & tools
+        uses: asdf-vm/actions/install@v2
+      - name: custom environment variables
+        uses: krisalay/export-env@v1.0.0
+        with:
+          filename: e2e-testing/env
+      - uses: helm/kind-action@v1.4.0
+        if: inputs.kind_image == ''
+        with:
+          node_image: "${{ env.KIND_CUSTOM_IMAGE }}"
+          version: "v${{ env.KIND_VERSION }}"
+          cluster_name: kuttl
+      - uses: helm/kind-action@v1.4.0
+        if: inputs.kind_image != ''
+        with:
+          node_image: ${{ inputs.kind_image }}
+          version: "v${{ env.KIND_VERSION }}"
+          cluster_name: kuttl
+      - name: add to PATH
+        run: |
+          mkdir -p ${HOME}/bin
+          echo "${HOME}/bin" >> "$GITHUB_PATH"
+      - name: install istio (custom version)
+        run: |
+          asdf install istioctl ${{ inputs.istio_ver }}
+          asdf local istioctl ${{ inputs.istio_ver }}
+          istioctl version --remote=false
+        if: inputs.istio_ver != ''
+      - name: Setup Cluster
+        run: ./e2e-testing/scripts/setup.sh up
+        env:
+          KIND_CLUSTER_NAME: kuttl
+      # Uncomment the next step to access a shell on github actions.
+      #      - name: tmate debug session
+      #        uses: mxschmitt/action-tmate@v3
+      - name: Run kuttl tests
+        run: |
+          # Let the system enough time to start
+          sleep 30
+          make kuttl

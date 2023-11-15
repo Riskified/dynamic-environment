@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: details
+  namespace: modify-valid-httproutes
+spec:
+  http:
+    - match:
+      - gateways:
+        - mesh
+      route:
+        - destination:
+            host: details
+            subset: shared
+        - destination:
+            host: another-details
+            subset: shared
+    - route:
+      - destination:
+          host: details
+          subset: shared
