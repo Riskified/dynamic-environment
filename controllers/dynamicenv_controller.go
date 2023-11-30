@@ -19,10 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
-	"time"
-
 	istioapi "istio.io/api/networking/v1alpha3"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,6 +32,8 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sort"
+	"strings"
 
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/handlers"
@@ -312,7 +310,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if nonReadyExists && rls.returnError == nil {
 		// Currently we don't get updates on resource's status changes, so we need to requeue.
 		log.V(1).Info("Requeue because of non running status")
-		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
+		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{}, rls.returnError
 }
@@ -360,7 +358,6 @@ func (r *DynamicEnvReconciler) addFinalizersIfRequired(ctx context.Context, de *
 }
 
 func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv, version string) (ctrl.Result, error) {
-	var resources int
 	log := ctrllog.FromContext(ctx)
 	log.Info("Dynamic Env marked for deletion, cleaning up ...")
 	if helpers.StringSliceContains(names.DeleteDeployments, de.Finalizers) {
@@ -369,7 +366,11 @@ func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de 
 			log.Error(err, "error removing cleanupDeployments finalizer")
 			return ctrl.Result{}, err
 		}
-		resources += count
+		if count == 0 {
+			if err := r.deleteFinalizer(ctx, names.DeleteDeployments, de); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 	if helpers.StringSliceContains(names.DeleteDestinationRules, de.Finalizers) {
 		count, err := r.cleanupDestinationRules(ctx, de)
@@ -377,18 +378,22 @@ func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de 
 			log.Error(err, "error removing DeleteDestinationRules finalizer")
 			return ctrl.Result{}, err
 		}
-		resources += count
+		if count == 0 {
+			if err := r.deleteFinalizer(ctx, names.DeleteDestinationRules, de); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 	}
 	if helpers.StringSliceContains(names.CleanupVirtualServices, de.Finalizers) {
 		if err := r.cleanupVirtualServices(ctx, de, version); err != nil {
 			log.Error(err, "error removing CleanupVirtualServices finalizer")
 			return ctrl.Result{}, err
 		}
+		if err := r.deleteFinalizer(ctx, names.CleanupVirtualServices, de); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
-	if resources > 0 {
-		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
-	}
 	return ctrl.Result{}, nil
 }
 
@@ -417,10 +422,7 @@ func (r *DynamicEnvReconciler) cleanupDeployments(ctx context.Context, de *riski
 			return runningCount, fmt.Errorf("error deleting deployment %v: %w", found, err)
 		}
 	}
-	if runningCount > 0 {
-		return runningCount, nil
-	}
-	return runningCount, r.deleteFinalizer(ctx, names.DeleteDeployments, de)
+	return runningCount, nil
 }
 
 // Deletes created destination rules on controller deletion. Deletes the finalizer once all DRs are deleted. Returns the
@@ -445,7 +447,7 @@ func (r *DynamicEnvReconciler) cleanupDestinationRules(ctx context.Context, de *
 			return runningCount, fmt.Errorf("error deleting destination rule %v: %w", &found, err)
 		}
 	}
-	return runningCount, r.deleteFinalizer(ctx, names.DeleteDestinationRules, de)
+	return runningCount, nil
 }
 
 func (r *DynamicEnvReconciler) cleanupVirtualServices(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv, version string) error {
@@ -476,7 +478,7 @@ func (r *DynamicEnvReconciler) cleanupVirtualServices(ctx context.Context, de *r
 			return err
 		}
 	}
-	return r.deleteFinalizer(ctx, names.CleanupVirtualServices, de)
+	return nil
 }
 
 func (r *DynamicEnvReconciler) deleteFinalizer(ctx context.Context, finalizer string, de *riskifiedv1alpha1.DynamicEnv) error {
