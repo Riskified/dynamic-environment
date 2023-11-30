@@ -110,8 +110,13 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 	// h.Log.V(1).Info("status found for deployment", "deployment", searchName, "status", deployment.Status)
 
 	found, processing := getMostRecentConditionForType(appsv1.DeploymentProgressing, deployment.Status.Conditions)
-	if deployment.Status.AvailableReplicas > 0 {
-		if found && processing.Status == v1.ConditionTrue && processing.Reason != "NewReplicaSetAvailable" {
+	if !found {
+		return genStatus(riskifiedv1alpha1.Unknown), nil
+	}
+	if processing.Status == v1.ConditionTrue {
+		if processing.Reason == "NewReplicaSetAvailable" {
+			return genStatus(riskifiedv1alpha1.Running), nil
+		} else {
 			var status riskifiedv1alpha1.LifeCycleStatus
 			if h.Updating {
 				status = riskifiedv1alpha1.Updating
@@ -120,16 +125,9 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 			}
 			return genStatus(status), nil
 		}
-		return genStatus(riskifiedv1alpha1.Running), nil
 	} else {
-		if found && processing.Status == v1.ConditionTrue {
-			return genStatus(riskifiedv1alpha1.Initializing), nil
-		}
-		if found && processing.Status == v1.ConditionFalse {
-			return genStatus(riskifiedv1alpha1.Failed), nil
-		}
+		return genStatus(riskifiedv1alpha1.Failed), nil
 	}
-	return genStatus(riskifiedv1alpha1.Unknown), nil
 }
 
 func (h *DeploymentHandler) ApplyStatus(rs riskifiedv1alpha1.ResourceStatus) error {
@@ -289,8 +287,14 @@ func getMostRecentConditionForType(typ appsv1.DeploymentConditionType, condition
 	var result appsv1.DeploymentCondition
 	for _, c := range conditions {
 		if c.Type == typ {
-			found = true
-			result = c
+			if found {
+				if result.LastUpdateTime.Before(&c.LastUpdateTime) {
+					result = c
+				}
+			} else {
+				found = true
+				result = c
+			}
 		}
 	}
 	return found, result
