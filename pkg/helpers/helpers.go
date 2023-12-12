@@ -64,14 +64,16 @@ func Shorten(msg string, length int) string {
 	}
 }
 
-func UniqueDynamicEnvName(name, namespace string) string {
+func UniqueDynamicEnvName(de *riskifiedv1alpha1.DynamicEnv) string {
+	name := de.Name
+	ns := de.Namespace
 	if len(name) > 40 {
 		name = name[:40]
 	}
-	if len(namespace) > 20 {
-		namespace = namespace[:20]
+	if len(ns) > 20 {
+		ns = ns[:20]
 	}
-	return fmt.Sprintf("%s-%s", namespace, name)
+	return fmt.Sprintf("%s-%s", ns, name)
 }
 
 // This is a temporary hack so we should not care about edge cases:
