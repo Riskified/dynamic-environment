@@ -1,0 +1,25 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-add-remove-subsets
+  namespace: default
+status:
+  state: ready
+  subsetsStatus:
+    details-default-dynamicenv-add-remove-subsets:
+      deployment:
+        name: details-default-dynamicenv-add-remove-subsets
+        namespace: add-remove-subsets
+        status: running
+      destinationRules:
+        - name: details-default-dynamicenv-add-remove-subsets-details
+          namespace: add-remove-subsets
+          status: running
+      virtualServices:
+        - name: details
+          namespace: add-remove-subsets
+          status: running
+  totalCount: 1
+  totalReady: 1
+...

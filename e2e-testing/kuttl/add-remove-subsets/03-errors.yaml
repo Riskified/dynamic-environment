@@ -1,0 +1,14 @@
+# TODO: find a way to verify that the DynamicEnv Status object does not contain removed subsets/consumers.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-default-dynamicenv-add-remove-subsets
+  namespace: add-remove-subsets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: details-worker-default-dynamicenv-add-remove-subsets
+  namespace: add-remove-subsets
+...
