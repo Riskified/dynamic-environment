@@ -422,36 +422,6 @@ var _ = Describe("Validating Webhook", func() {
 				Expect(errorResult.Error()).To(ContainSubstring(partialError))
 			},
 			Entry(
-				"Removing Subset",
-				"fixtures/disallowed-modifications-removing-subset-old.yaml",
-				"fixtures/disallowed-modifications-removing-subset-new.yaml",
-				"add or remove",
-			),
-			Entry(
-				"Removing Consumer",
-				"fixtures/disallowed-modifications-removing-consumer-old.yaml",
-				"fixtures/disallowed-modifications-removing-consumer-new.yaml",
-				"add or remove",
-			),
-			Entry(
-				"Adding Subset",
-				"fixtures/disallowed-modifications-adding-subset-old.yaml",
-				"fixtures/disallowed-modifications-adding-subset-new.yaml",
-				"add or remove",
-			),
-			Entry(
-				"modifying subsets name",
-				"fixtures/disallowed-modifications-modifying-subset-name-old.yaml",
-				"fixtures/disallowed-modifications-modifying-subset-name-new.yaml",
-				"name/namespace of subset",
-			),
-			Entry(
-				"modifying subsets namespace",
-				"fixtures/disallowed-modifications-modifying-subsets-namespace-old.yaml",
-				"fixtures/disallowed-modifications-modifying-subsets-namespace-new.yaml",
-				"name/namespace of subset",
-			),
-			Entry(
 				"modifying container name",
 				"fixtures/disallowed-modifications-modifying-container-name-old.yaml",
 				"fixtures/disallowed-modifications-modifying-container-name-new.yaml",

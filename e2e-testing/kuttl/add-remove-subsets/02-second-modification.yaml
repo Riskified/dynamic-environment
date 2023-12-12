@@ -1,0 +1,23 @@
+---
+apiVersion: riskified.com/v1alpha1
+kind: DynamicEnv
+metadata:
+  name: dynamicenv-add-remove-subsets
+spec:
+  istioMatches:
+    - headers:
+        end-user:
+          prefix: jason
+  subsets:
+    - name: reviews
+      namespace: add-remove-subsets
+      containers:
+        - containerName: reviews
+          command: ["/opt/ibm/wlp/bin/server", "run", "defaultServer"]
+          image: docker.io/istio/examples-bookinfo-reviews-v3:1.16.2
+          env:
+            - name: TOPIC_NAME
+              value: test
+  # if not specified explicit as empty kuttl does not remove the existing consumer...
+  consumers:
+...

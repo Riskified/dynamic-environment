@@ -53,6 +53,7 @@ type DynamicEnvReconciler struct {
 
 type ReconcileLoopStatus struct {
 	returnError      error
+	cleanupError     error
 	subsetMessages   map[string]riskifiedv1alpha1.SubsetMessages
 	consumerMessages map[string][]string
 	// Non ready consumers and subsets
@@ -117,10 +118,10 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to fetch dynamic environment: %w", err)
 	}
 
-	uniqueVersion := helpers.UniqueDynamicEnvName(dynamicEnv.Name, dynamicEnv.Namespace)
+	uniqueVersion := helpers.UniqueDynamicEnvName(dynamicEnv)
 
 	if markedForDeletion(dynamicEnv) {
-		return r.cleanDynamicEnvResources(ctx, dynamicEnv, uniqueVersion)
+		return r.cleanDynamicEnvResources(ctx, dynamicEnv)
 	}
 
 	if err := r.addFinalizersIfRequired(ctx, dynamicEnv); err != nil {
@@ -142,9 +143,13 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	subsetsAndConsumers := mergeSubsetsAndConsumers(dynamicEnv.Spec.Subsets, dynamicEnv.Spec.Consumers)
 
+	if err := r.cleanupRemovedSubsetsOrConsumers(ctx, subsetsAndConsumers, uniqueVersion, dynamicEnv); err != nil {
+		rls.cleanupError = err
+	}
+
 	for _, st := range subsetsAndConsumers {
 		s := st.Subset
-		uniqueName := s.Name + "-" + uniqueVersion
+		uniqueName := mkSubsetUniqueName(s.Name, uniqueVersion)
 		defaultVersionForSubset := r.DefaultVersion
 		if s.DefaultVersion != "" {
 			defaultVersionForSubset = s.DefaultVersion
@@ -247,6 +252,12 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if rls.cleanupError != nil {
+		// While the error occurred previously these errors are less important than the main subsets loop so we apply
+		// them now only if not masking.
+		rls.setErrorIfNotMasking(rls.returnError)
+	}
+
 	for _, handler := range deploymentHandlers {
 		newStatus, err := handler.GetStatus()
 		if err != nil {
@@ -303,8 +314,12 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	statusHandler.SyncSubsetMessagesToStatus(rls.subsetMessages)
 	statusHandler.SyncConsumerMessagesToStatus(rls.consumerMessages)
 	if err := statusHandler.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
-		log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
-		rls.setErrorIfNotMasking(err)
+		if errors.IsConflict(err) {
+			log.Info("Ignoring global status update error due to conflict")
+		} else {
+			log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
+			rls.setErrorIfNotMasking(err)
+		}
 	}
 
 	if nonReadyExists && rls.returnError == nil {
@@ -313,6 +328,28 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{}, rls.returnError
+}
+
+func findDeletedSC(de *riskifiedv1alpha1.DynamicEnv, allSC map[string]riskifiedv1alpha1.SubsetOrConsumer) map[string]riskifiedv1alpha1.SubsetOrConsumer {
+	var keys []string
+	for k := range allSC {
+		keys = append(keys, k)
+	}
+	var removed = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
+	for name := range de.Status.ConsumersStatus {
+		if !helpers.StringSliceContains(name, keys) {
+			removed[name] = riskifiedv1alpha1.CONSUMER
+		}
+	}
+	for name := range de.Status.SubsetsStatus {
+		if !helpers.StringSliceContains(name, keys) {
+			removed[name] = riskifiedv1alpha1.SUBSET
+		}
+	}
+	if len(removed) > 0 {
+		ctrl.Log.V(1).Info("Found subsets/consumers to be cleaned up", "subsets/consumers", removed)
+	}
+	return removed
 }
 
 func (r *DynamicEnvReconciler) locateMatchingServiceHostnames(ctx context.Context, namespace string, ls labels.Set) (serviceHosts []string, err error) {
@@ -357,7 +394,7 @@ func (r *DynamicEnvReconciler) addFinalizersIfRequired(ctx context.Context, de *
 	return nil
 }
 
-func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv, version string) (ctrl.Result, error) {
+func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 	log.Info("Dynamic Env marked for deletion, cleaning up ...")
 	if helpers.StringSliceContains(names.DeleteDeployments, de.Finalizers) {
@@ -385,7 +422,7 @@ func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de 
 		}
 	}
 	if helpers.StringSliceContains(names.CleanupVirtualServices, de.Finalizers) {
-		if err := r.cleanupVirtualServices(ctx, de, version); err != nil {
+		if err := r.cleanupVirtualServices(ctx, de); err != nil {
 			log.Error(err, "error removing CleanupVirtualServices finalizer")
 			return ctrl.Result{}, err
 		}
@@ -450,32 +487,13 @@ func (r *DynamicEnvReconciler) cleanupDestinationRules(ctx context.Context, de *
 	return runningCount, nil
 }
 
-func (r *DynamicEnvReconciler) cleanupVirtualServices(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv, version string) error {
+func (r *DynamicEnvReconciler) cleanupVirtualServices(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv) error {
 	vss := collectVirtualServices(de)
 	for _, item := range vss {
-		ctrl.Log.Info("Cleaning up Virtual Service ...", "virtual-service", item)
-		found := istionetwork.VirtualService{}
-		if err := r.Get(ctx, types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, &found); err != nil {
-			if errors.IsNotFound(err) {
-				ctrl.Log.Info("Cleanup: Didn't find virtual service. Probably deleted", "virtual-service", item)
-				continue
-			}
-			ctrl.Log.Error(err, "error searching for virtual service during cleanup", "virtual-service", item)
-			return err
-		}
-		var newRoutes []*istioapi.HTTPRoute
-		for _, route := range found.Spec.Http {
-			if strings.HasPrefix(route.Name, helpers.CalculateVirtualServicePrefix(version, "")) {
-				ctrl.Log.V(1).Info("Found route to cleanup", "route", route)
-				continue
-			}
-			newRoutes = append(newRoutes, route)
-		}
-		found.Spec.Http = newRoutes
-		watches.RemoveFromAnnotation(types.NamespacedName{Name: de.Name, Namespace: de.Namespace}, &found)
-		if err := r.Update(ctx, &found); err != nil {
-			ctrl.Log.Error(err, "error updating virtual service after cleanup", "virtual-service", found.Name)
-			return err
+		// TODO: trying to ignore version collision and return nil causes a lot of kuttl tests failures and dynamic
+		// 		 environments who could not be deleted because of finalizers.
+		if err := r.cleanupVirtualService(ctx, item, de); err != nil {
+			return fmt.Errorf("cleaning up all virtual services: %w", err)
 		}
 	}
 	return nil
@@ -500,6 +518,154 @@ func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &istionetwork.VirtualService{}}, &watches.EnqueueRequestForAnnotation{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
+}
+
+// Cleanup subsets and consumers that are removed from the dynamic environment CRD.
+func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, version string, de *riskifiedv1alpha1.DynamicEnv) error {
+	var allSC = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
+	for _, st := range subsetsAndConsumers {
+		uniqueName := mkSubsetUniqueName(st.Subset.Name, version)
+		allSC[uniqueName] = st.Type
+	}
+	deletedSC := findDeletedSC(de, allSC)
+	for name, typ := range deletedSC {
+		if typ == riskifiedv1alpha1.CONSUMER {
+			if err := r.cleanupConsumer(ctx, name, de); err != nil {
+				if errors.IsConflict(err) {
+					ctrl.Log.Info("Ignoring conflict removing consumer", "consumer", name)
+				} else {
+					ctrl.Log.Error(err, "cleanup removed consumer")
+					return fmt.Errorf("cleanup removed consumer: %w", err)
+				}
+			}
+		} else {
+			if err := r.cleanupSubset(ctx, name, de); err != nil {
+				if errors.IsConflict(err) {
+					ctrl.Log.Info("Ignoring conflict removing subset", "subset", name)
+				} else {
+					ctrl.Log.Error(err, "cleanup removed subset")
+					return fmt.Errorf("cleanup removed subset: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// searches for `name` in the consumersStatus and delete it. If not found deletes from status
+func (r *DynamicEnvReconciler) cleanupConsumer(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) error {
+	st, ok := de.Status.ConsumersStatus[name]
+	if ok {
+		// todo delete resources
+		found, err := r.deleteDeployment(ctx, st.ResourceStatus)
+		if err != nil {
+			return fmt.Errorf("deleting removed consumer: %w", err)
+		}
+		if !found {
+			delete(de.Status.ConsumersStatus, name)
+			if err := r.Status().Update(ctx, de); err != nil {
+				return fmt.Errorf("deleting removed consumer status: %w", err)
+			}
+		}
+	}
+	ctrl.Log.V(1).Info("Consumer cleanup finished", "consumer", name)
+	return nil
+}
+
+// searches for `name` in the subsetsStatus and delete it. If not found deletes from status
+func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) error {
+	st, ok := de.Status.SubsetsStatus[name]
+	exists := false
+	if ok {
+		found, err := r.deleteDeployment(ctx, st.Deployment)
+		if err != nil {
+			return fmt.Errorf("deleting deployment from removed subset: %w", err)
+		}
+		if found {
+			exists = found
+		}
+		for _, dr := range st.DestinationRules {
+			found, err := r.deleteDestinationRule(ctx, dr)
+			if err != nil {
+				return fmt.Errorf("deleting destination rule from removed subset: %w", err)
+			}
+			if found {
+				exists = found
+			}
+		}
+		for _, vs := range st.VirtualServices {
+			if err := r.cleanupVirtualService(ctx, vs, de); err != nil {
+				return fmt.Errorf("cleaning virtual servive from removed subset routes: %w", err)
+			}
+		}
+	}
+	if !exists {
+		delete(de.Status.SubsetsStatus, name)
+		if err := r.Status().Update(ctx, de); err != nil {
+			return fmt.Errorf("deleting removed subset status: %w", err)
+		}
+	}
+	ctrl.Log.V(1).Info("Subset cleanup finished", "subset", name)
+	return nil
+}
+
+func (r *DynamicEnvReconciler) deleteDeployment(ctx context.Context, deployment riskifiedv1alpha1.ResourceStatus) (found bool, err error) {
+	dep := appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, &dep); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("fetching deployment for removal: %w", err)
+	}
+	if err := r.Delete(ctx, &dep); err != nil {
+		return true, fmt.Errorf("deoeting deployment: %w", err)
+	}
+	return true, nil
+}
+
+func (r *DynamicEnvReconciler) deleteDestinationRule(ctx context.Context, dr riskifiedv1alpha1.ResourceStatus) (found bool, err error) {
+	toDelete := istionetwork.DestinationRule{}
+	if err := r.Get(ctx, types.NamespacedName{Name: dr.Name, Namespace: dr.Namespace}, &toDelete); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("fetching destination rule for deletion: %w", err)
+	}
+	if err := r.Delete(ctx, &toDelete); err != nil {
+		return true, fmt.Errorf("deleting destination rule: %w", err)
+	}
+	return true, nil
+}
+
+func (r *DynamicEnvReconciler) cleanupVirtualService(ctx context.Context, vs riskifiedv1alpha1.ResourceStatus, de *riskifiedv1alpha1.DynamicEnv) error {
+	version := helpers.UniqueDynamicEnvName(de)
+	ctrl.Log.Info("Cleaning up Virtual Service ...", "virtual-service", vs)
+	found := istionetwork.VirtualService{}
+	if err := r.Get(ctx, types.NamespacedName{Name: vs.Name, Namespace: vs.Namespace}, &found); err != nil {
+		if errors.IsNotFound(err) {
+			ctrl.Log.Info("Cleanup: Didn't find virtual service. Probably deleted", "virtual-service", vs)
+			return nil
+		} else {
+			ctrl.Log.Error(err, "error searching for virtual service during cleanup", "virtual-service", vs)
+			return err
+		}
+	}
+	var newRoutes []*istioapi.HTTPRoute
+	for _, route := range found.Spec.Http {
+		if strings.HasPrefix(route.Name, helpers.CalculateVirtualServicePrefix(version, "")) {
+			ctrl.Log.V(1).Info("Found route to cleanup", "route", route)
+			continue
+		}
+		newRoutes = append(newRoutes, route)
+	}
+	found.Spec.Http = newRoutes
+	watches.RemoveFromAnnotation(types.NamespacedName{Name: de.Name, Namespace: de.Namespace}, &found)
+	if err := r.Update(ctx, &found); err != nil {
+		ctrl.Log.Error(err, "error updating virtual service after cleanup", "virtual-service", found.Name)
+		return err
+	}
+	return nil
 }
 
 func mergeSubsetsAndConsumers(subsets, consumers []riskifiedv1alpha1.Subset) []SubsetType {
@@ -531,4 +697,8 @@ func collectVirtualServices(de *riskifiedv1alpha1.DynamicEnv) []riskifiedv1alpha
 
 func markedForDeletion(de *riskifiedv1alpha1.DynamicEnv) bool {
 	return de.DeletionTimestamp != nil
+}
+
+func mkSubsetUniqueName(name, version string) string {
+	return name + "-" + version
 }
