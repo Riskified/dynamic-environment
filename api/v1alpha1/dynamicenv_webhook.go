@@ -1,5 +1,5 @@
 /*
-Copyright 2021.
+Copyright 2023 Riskified Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -163,23 +163,17 @@ func (de *DynamicEnv) validateIstioMatchImmutable(old runtime.Object) error {
 func (de *DynamicEnv) validatePartialUpdateSubsets(old runtime.Object) error {
 	oldSubsets := append(old.(*DynamicEnv).Spec.Subsets, old.(*DynamicEnv).Spec.Consumers...)
 	newSubsets := append(de.Spec.Subsets, de.Spec.Consumers...)
-	if len(oldSubsets) != len(newSubsets) {
-		desc := "Unsupported operation: add or remove subset"
-		return field.Invalid(field.NewPath("spec").Child("Subsets"), newSubsets, desc)
-	}
 	for _, subset := range oldSubsets {
-		if err := findMatchingSubset(subset, newSubsets); err != nil {
+		if err := validateSubsetModifications(subset, newSubsets); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func findMatchingSubset(old Subset, subsets []Subset) error {
-	var foundMatching = false
+func validateSubsetModifications(old Subset, subsets []Subset) error {
 	for _, s := range subsets {
 		if old.Name == s.Name && old.Namespace == s.Namespace {
-			foundMatching = true
 			if err := compareContainers(old.Containers, s.Containers); err != nil {
 				desc := fmt.Sprintf("couldn't find matching container to existing container: %s", err.Error())
 				return field.Invalid(
@@ -198,11 +192,8 @@ func findMatchingSubset(old Subset, subsets []Subset) error {
 				)
 				return field.Invalid(field.NewPath("spec").Child("Subsets"), subsets, desc)
 			}
+			break
 		}
-	}
-	if !foundMatching {
-		desc := "Changing name/namespace of subset is forbidden"
-		return field.Invalid(field.NewPath("spec").Child("Subsets"), subsets, desc)
 	}
 	return nil
 }
