@@ -1,4 +1,5 @@
-# Dynamic Environment Controller
+# Dynamic Environment Controller <img src="https://riskified.github.io/dynamic-environment-docs/img/de-logo.svg" alt="Dynamic Environment Logo" width="20">
+
 
 A k8s operator which supports testing on a multi-test workflows environment in a
 transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource. 
