@@ -4,6 +4,7 @@ A k8s operator which supports testing on a multi-test workflows environment in a
 transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource. 
 In this resource we will configure the services from which we want to create a subset with new version of our app 
 and apply all the requirements for routing the requests to the matching subsets.
+Ready to get started? Check out the [docs](https://riskified.github.io/dynamic-environment-docs/).
 
 ## Setting Development Environment
 
