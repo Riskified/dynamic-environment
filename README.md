@@ -1,10 +1,9 @@
 # Dynamic Environment Controller
 
-k8s operator which supports testing on multi-test workflows environment in a
-transparency way. This operator will listen to DynamicEnv a new Riskified custom
-resource which there we will configure the services that we want to create from
-them a subset with new version and apply all the requirements for routing the
-requests to match subsets.
+A k8s operator which supports testing on a multi-test workflows environment in a
+transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource. 
+In this resource we will configure the services from which we want to create a subset with new version of our app 
+and apply all the requirements for routing the requests to the matching subsets.
 
 ## Setting Development Environment
 
@@ -37,7 +36,7 @@ asdf install
 You should now have the right versions of the tools installed. As long as you installed _asdf_
 correctly, and you're running from within the repository root you'll be using the right versions.
 
-Here are other tools that while not required can make life easier:
+Here are other tools, that while not required, can make life easier:
 
 * `kubectl`: Make sure it's a version that matches our cluster version according to the [version
   skew policy][skew] (if you don't want to mess with multiple versions, and you're using minikube
@@ -57,7 +56,7 @@ make prepare
 
 ### Kubernetes Setup for Development and Testing
 
-After we have the tools we need to install two kubernetes clusters. One for Development and one for
+After we have the tools we need, it's time to install two kubernetes clusters. One for Development and one for
 running tests locally. Below is an optional suggestion for installing and configuring these
 clusters. Feel free to replace all the components except _KInd_ (so your test setup will be as
 similar to the _CI_ as possible).
@@ -75,7 +74,7 @@ resources on it, it's better to give it more resources than the default:
 minikube start --kubernetes-version v1.26.3 --memory 8g --cpus 4
 ```
 
-For the rest of the command make sure you're _kubectl_ is operating on the minikube context:
+For the rest of the command make sure your _kubectl_ is operating on the minikube context:
 
 ```shell
 kubectx -c # should return 'minikube'
@@ -87,7 +86,7 @@ Next, install Istio:
 istioctl install --set profile=demo -y
 ```
 
-If you want some basic building blocks to play with you can install a slightly modified version of
+If you want some basic building blocks to play with, you can install a slightly modified version of
 the _Istio_ _BookInfo_ application, so you'll have some application to experiment on. This command
 will install _BookInfo_ environment on a newly created _services_ namespace. It will also apply
 required labels (note that if you're not using these resources you have to apply the
@@ -148,7 +147,7 @@ If you want to clean up the test cluster you can run one of the following comman
 
 ## Running the Operator Locally for Development
 
-The development cluster is meant to be used a target for out development process. As such it's
+The development cluster is meant to be used as a target for our development process. As such, it's
 missing some components:
 
 * Validating webhook.
@@ -160,7 +159,7 @@ To run our development operator:
 make install run
 ```
 
-On another shell you can deploy a sample _dynamic-environment_ resource to see the effect:
+On another shell session you can deploy a sample _dynamic-environment_ resource to see the effect:
 
 ```shell
 kubectl create -f config/samples/riskified_v1alpha1_dynamicenv.yaml
@@ -219,7 +218,7 @@ kuttl test --start-kind=false -n default --timeout 20 ./e2e-testing/kuttl --test
 
 ## Running Linters
 
-While we run default linters in during out _test_ stage, it's advisable to occasionally run other
+While we run default linters during our _test_ stage, it's advisable to occasionally run other
 linters. These should not break the build (and not included in our configuration) and might contain
 a lot of false positives, however you should occasionally run them to manually search for errors:
 
