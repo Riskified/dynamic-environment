@@ -122,8 +122,7 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 			return riskifiedv1alpha1.ResourceStatus{}, e
 		}
 	}
-	// TODO: This fails in testing - try to make it work.
-	// h.Log.V(1).Info("status found for deployment", "deployment", searchName, "status", deployment.Status)
+	h.Log.V(1).Info("status found for deployment", "deployment", searchName, "status", deployment.Status)
 
 	found, processing := getMostRecentConditionForType(appsv1.DeploymentProgressing, deployment.Status.Conditions)
 	if !found {
