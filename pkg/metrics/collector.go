@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	log                     = ctrl.Log.WithName("collector")
+	log                     = ctrl.Log.WithName("DynamicEnvCollector")
 	runningEnvironmentsDesc = prometheus.NewDesc(
 		"dynamic_environments",
 		"Number of deployed dynamic environments per namespace",
