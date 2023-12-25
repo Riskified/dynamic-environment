@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sort"
@@ -41,6 +40,8 @@ import (
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"github.com/riskified/dynamic-environment/pkg/watches"
 )
+
+var log = helpers.MkLogger("DynamicEnvReconciler")
 
 // DynamicEnvReconciler reconciles a DynamicEnv object
 type DynamicEnvReconciler struct {
@@ -99,7 +100,6 @@ func (rls *ReconcileLoopStatus) addDeploymentMessage(subset string, tpe riskifie
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.10.0/pkg/reconcile
 func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	log.V(1).Info("Entered Reconcile Loop")
 	rls := ReconcileLoopStatus{
 		subsetMessages:   make(map[string]riskifiedv1alpha1.SubsetMessages),
@@ -119,6 +119,8 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	uniqueVersion := helpers.UniqueDynamicEnvName(dynamicEnv)
+	resourceName := fmt.Sprintf("%s/%s", dynamicEnv.Namespace, dynamicEnv.Name)
+	log = log.WithValues("resource", resourceName)
 
 	if markedForDeletion(dynamicEnv) {
 		return r.cleanDynamicEnvResources(ctx, dynamicEnv)
@@ -178,7 +180,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			StatusHandler:  &statusHandler,
 			Matches:        dynamicEnv.Spec.IstioMatches,
 			Subset:         s,
-			Log:            log,
+			Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
 			Ctx:            ctx,
 		}
 		deploymentHandlers = append(deploymentHandlers, &deploymentHandler)
@@ -207,7 +209,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				StatusHandler:  &statusHandler,
 				ServiceHosts:   serviceHosts,
 				Owner:          owner,
-				Log:            log,
+				Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
 				Ctx:            ctx,
 			}
 			mrHandlers = append(mrHandlers, &destinationRuleHandler)
@@ -227,14 +229,14 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				DefaultVersion: defaultVersionForSubset,
 				DynamicEnv:     dynamicEnv,
 				StatusHandler:  &statusHandler,
-				Log:            log,
+				Log:            helpers.MkLogger("VirtualServiceHandler", "resource", resourceName),
 				Ctx:            ctx,
 			}
 
 			mrHandlers = append(mrHandlers, &virtualServiceHandler)
 			if err := virtualServiceHandler.Handle(); err != nil {
 				if errors.IsConflict(err) {
-					ctrl.Log.V(1).Info("ignoring update error due to version conflict", "error", err)
+					log.V(1).Info("ignoring update error due to version conflict", "error", err)
 				} else {
 					log.Error(err, "error updating virtual service for subset", "subset", s.Name)
 					msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
@@ -347,7 +349,7 @@ func findDeletedSC(de *riskifiedv1alpha1.DynamicEnv, allSC map[string]riskifiedv
 		}
 	}
 	if len(removed) > 0 {
-		ctrl.Log.V(1).Info("Found subsets/consumers to be cleaned up", "subsets/consumers", removed)
+		log.V(1).Info("Found subsets/consumers to be cleaned up", "subsets/consumers", removed)
 	}
 	return removed
 }
@@ -395,7 +397,6 @@ func (r *DynamicEnvReconciler) addFinalizersIfRequired(ctx context.Context, de *
 }
 
 func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv) (ctrl.Result, error) {
-	log := ctrllog.FromContext(ctx)
 	log.Info("Dynamic Env marked for deletion, cleaning up ...")
 	if helpers.StringSliceContains(names.DeleteDeployments, de.Finalizers) {
 		count, err := r.cleanupDeployments(ctx, de)
@@ -446,7 +447,7 @@ func (r *DynamicEnvReconciler) cleanupDeployments(ctx context.Context, de *riski
 		deployments = append(deployments, c.ResourceStatus)
 	}
 	for _, item := range deployments {
-		ctrl.Log.Info("Cleaning up deployment ...", "deployment", item)
+		log.Info("Cleaning up deployment ...", "deployment", item)
 		found := appsv1.Deployment{}
 		if err := r.Get(ctx, types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, &found); err != nil { // if not found assume deleted
 			if errors.IsNotFound(err) {
@@ -471,7 +472,7 @@ func (r *DynamicEnvReconciler) cleanupDestinationRules(ctx context.Context, de *
 		drs = append(drs, s.DestinationRules...)
 	}
 	for _, item := range drs {
-		ctrl.Log.Info("Cleaning up destination rule ...", "destinationRule", item)
+		log.Info("Cleaning up destination rule ...", "destinationRule", item)
 		found := istionetwork.DestinationRule{}
 		if err := r.Get(ctx, types.NamespacedName{Name: item.Name, Namespace: item.Namespace}, &found); err != nil {
 			if errors.IsNotFound(err) { // if not found assume deleted
@@ -500,7 +501,7 @@ func (r *DynamicEnvReconciler) cleanupVirtualServices(ctx context.Context, de *r
 }
 
 func (r *DynamicEnvReconciler) deleteFinalizer(ctx context.Context, finalizer string, de *riskifiedv1alpha1.DynamicEnv) error {
-	ctrl.Log.Info("Deleting finalizer from dynamic env", "finalizer", finalizer)
+	log.Info("Deleting finalizer from dynamic env", "finalizer", finalizer)
 	remainingFinalizers := helpers.RemoveItemFromStringSlice(finalizer, de.Finalizers)
 	de.Finalizers = remainingFinalizers
 	if err := r.Update(ctx, de); err != nil {
@@ -532,18 +533,18 @@ func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Cont
 		if typ == riskifiedv1alpha1.CONSUMER {
 			if err := r.cleanupConsumer(ctx, name, de); err != nil {
 				if errors.IsConflict(err) {
-					ctrl.Log.Info("Ignoring conflict removing consumer", "consumer", name)
+					log.Info("Ignoring conflict removing consumer", "consumer", name)
 				} else {
-					ctrl.Log.Error(err, "cleanup removed consumer")
+					log.Error(err, "cleanup removed consumer")
 					return fmt.Errorf("cleanup removed consumer: %w", err)
 				}
 			}
 		} else {
 			if err := r.cleanupSubset(ctx, name, de); err != nil {
 				if errors.IsConflict(err) {
-					ctrl.Log.Info("Ignoring conflict removing subset", "subset", name)
+					log.Info("Ignoring conflict removing subset", "subset", name)
 				} else {
-					ctrl.Log.Error(err, "cleanup removed subset")
+					log.Error(err, "cleanup removed subset")
 					return fmt.Errorf("cleanup removed subset: %w", err)
 				}
 			}
@@ -569,7 +570,7 @@ func (r *DynamicEnvReconciler) cleanupConsumer(ctx context.Context, name string,
 			}
 		}
 	}
-	ctrl.Log.V(1).Info("Consumer cleanup finished", "consumer", name)
+	log.V(1).Info("Consumer cleanup finished", "consumer", name)
 	return nil
 }
 
@@ -606,7 +607,7 @@ func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, d
 			return fmt.Errorf("deleting removed subset status: %w", err)
 		}
 	}
-	ctrl.Log.V(1).Info("Subset cleanup finished", "subset", name)
+	log.V(1).Info("Subset cleanup finished", "subset", name)
 	return nil
 }
 
@@ -640,21 +641,21 @@ func (r *DynamicEnvReconciler) deleteDestinationRule(ctx context.Context, dr ris
 
 func (r *DynamicEnvReconciler) cleanupVirtualService(ctx context.Context, vs riskifiedv1alpha1.ResourceStatus, de *riskifiedv1alpha1.DynamicEnv) error {
 	version := helpers.UniqueDynamicEnvName(de)
-	ctrl.Log.Info("Cleaning up Virtual Service ...", "virtual-service", vs)
+	log.Info("Cleaning up Virtual Service ...", "virtual-service", vs)
 	found := istionetwork.VirtualService{}
 	if err := r.Get(ctx, types.NamespacedName{Name: vs.Name, Namespace: vs.Namespace}, &found); err != nil {
 		if errors.IsNotFound(err) {
-			ctrl.Log.Info("Cleanup: Didn't find virtual service. Probably deleted", "virtual-service", vs)
+			log.Info("Cleanup: Didn't find virtual service. Probably deleted", "virtual-service", vs)
 			return nil
 		} else {
-			ctrl.Log.Error(err, "error searching for virtual service during cleanup", "virtual-service", vs)
+			log.Error(err, "error searching for virtual service during cleanup", "virtual-service", vs)
 			return err
 		}
 	}
 	var newRoutes []*istioapi.HTTPRoute
 	for _, route := range found.Spec.Http {
 		if strings.HasPrefix(route.Name, helpers.CalculateVirtualServicePrefix(version, "")) {
-			ctrl.Log.V(1).Info("Found route to cleanup", "route", route)
+			log.V(1).Info("Found route to cleanup", "route", route)
 			continue
 		}
 		newRoutes = append(newRoutes, route)
@@ -662,7 +663,7 @@ func (r *DynamicEnvReconciler) cleanupVirtualService(ctx context.Context, vs ris
 	found.Spec.Http = newRoutes
 	watches.RemoveFromAnnotation(types.NamespacedName{Name: de.Name, Namespace: de.Namespace}, &found)
 	if err := r.Update(ctx, &found); err != nil {
-		ctrl.Log.Error(err, "error updating virtual service after cleanup", "virtual-service", found.Name)
+		log.Error(err, "error updating virtual service after cleanup", "virtual-service", found.Name)
 		return err
 	}
 	return nil
