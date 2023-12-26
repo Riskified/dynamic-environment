@@ -22,8 +22,9 @@ import (
 	"strings"
 
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+var log = MkLogger("DynamicEnv")
 
 const (
 	KeyValueHeaderSeparator    = ":"
@@ -104,7 +105,7 @@ func SerializeIstioMatchExactHeaders(headers map[string]riskifiedv1alpha1.String
 			}
 			fmt.Fprintf(&serialized, "%s%s%s", k, KeyValueHeaderSeparator, v.Exact)
 		} else {
-			ctrl.Log.V(1).Info("Ignoring non-exact header while serializing match for envoy filters", "ignored-key", k)
+			log.V(1).Info("Ignoring non-exact header while serializing match for envoy filters", "ignored-key", k)
 		}
 	}
 	return serialized.String()

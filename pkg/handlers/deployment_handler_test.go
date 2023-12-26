@@ -19,6 +19,7 @@ package handlers_test
 import (
 	"context"
 	"fmt"
+	"github.com/riskified/dynamic-environment/pkg/helpers"
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"io"
 	"os"
@@ -71,6 +72,7 @@ var _ = Describe("DeploymentHandler", func() {
 					Namespace: ns,
 				},
 				VersionLabel: names.DefaultVersionLabel,
+				Log:          helpers.MkLogger("TestsLogger"),
 			}
 		}
 

@@ -2,6 +2,7 @@
   <configuration default="false" name="Build &amp; Run" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="dynamic-environment" />
     <working_directory value="$PROJECT_DIR$" />
+    <parameters value="-zap-devel" />
     <envs>
       <env name="ENABLE_WEBHOOKS" value="false" />
     </envs>

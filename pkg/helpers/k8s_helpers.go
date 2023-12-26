@@ -18,9 +18,11 @@ package helpers
 
 import (
 	"fmt"
+	"github.com/go-logr/logr"
 
 	"github.com/riskified/dynamic-environment/pkg/names"
 	v1 "k8s.io/api/core/v1"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // MatchNamespacedHost compares the provided `hostname` and `namespace` to the provided `matchHost`.
@@ -76,4 +78,9 @@ func CalculateVirtualServicePrefix(version, subset string) string {
 		subsetPart = subset
 	}
 	return fmt.Sprintf("%s-%s-%s", names.VirtualServiceRoutePrefix, version, subsetPart)
+}
+
+// Generates Logger with provided values
+func MkLogger(name string, keysAndValues ...interface{}) logr.Logger {
+	return ctrllog.Log.WithName(name).WithValues(keysAndValues...)
 }

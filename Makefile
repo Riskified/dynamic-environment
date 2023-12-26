@@ -121,7 +121,7 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	ENABLE_WEBHOOKS=false go run ./main.go
+	ENABLE_WEBHOOKS=false go run ./main.go -zap-devel
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
