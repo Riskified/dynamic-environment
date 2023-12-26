@@ -1,8 +1,7 @@
 # Dynamic Environment Controller <img src="https://riskified.github.io/dynamic-environment-docs/img/de-logo.svg" alt="Dynamic Environment Logo" width="20">
 
-
 A k8s operator which supports testing on a multi-test workflows environment in a
-transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource. 
+transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource.
 In this resource we will configure the services from which we want to create a subset with new version of our app 
 and apply all the requirements for routing the requests to the matching subsets.
 Ready to get started? Check out the [docs](https://riskified.github.io/dynamic-environment-docs/).
@@ -160,6 +159,9 @@ To run our development operator:
 ```shell
 make install run
 ```
+
+> Note: if you run in development mode not using the `Makefile` add `-zap-devel` to your parameters
+> for better development logging.
 
 On another shell session you can deploy a sample _dynamic-environment_ resource to see the effect:
 

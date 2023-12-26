@@ -35,6 +35,9 @@ spec:
         - version
         - --default-version
         - shared
+        # uncomment the next two lines to set log level to debug (also error is valid value, default is info)
+        # - --zap-log-level
+        # - debug
         # uncomment below (and edit to your liking) to specify labels to be removed (comma separated list)
         #- --remove-labels
         #- argocd.argoproj.io/instance
