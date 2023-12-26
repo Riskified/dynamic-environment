@@ -60,6 +60,10 @@ spec:
         - --remove-labels
         - {{ $removeLabels }}
         {{- end }}
+        {{- if .Values.command.debugLogger }}
+        - --zap-log-level
+        - debug
+        {{- end }}
         command:
         - /manager
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

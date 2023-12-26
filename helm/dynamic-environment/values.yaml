@@ -34,6 +34,8 @@ command:
   # Specify a default version other than the default 'shared'. This version will be used when searching default
   # DestinationRule. Could be specified per subset in the CR.
   defaultVersion: "shared"
+  # Set log level to debug
+  debugLogger: false
 
 # Labels to be deleted form deployments when duplicating (e.g. labels that connect deployment to argocd app):
 labelsToRemove: []

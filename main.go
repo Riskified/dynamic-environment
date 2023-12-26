@@ -98,9 +98,7 @@ func main() {
 	flag.StringVar(&defaultVersion, "default-version", names.DefaultVersion,
 		"The global default version - this version is the one that gets the default route. Could be overridden per subset.")
 	flag.Var(&labelsToRemove, "remove-labels", "A comma separated list of labels to remove when duplicating deployment.")
-	opts := zap.Options{
-		Development: true,
-	}
+	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
