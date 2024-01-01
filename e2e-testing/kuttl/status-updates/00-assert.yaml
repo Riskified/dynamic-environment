@@ -8,7 +8,7 @@ status:
   totalCount: 1
   totalReady: 1
   subsetsStatus:
-    details-default-dynamicenv-status-updates:
+    status-updates/details:
       deployment:
         name: details-default-dynamicenv-status-updates
         namespace: status-updates

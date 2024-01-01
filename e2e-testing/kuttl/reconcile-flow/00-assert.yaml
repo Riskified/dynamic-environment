@@ -8,7 +8,7 @@ status:
   totalCount: 1
   totalReady: 0
   subsetsStatus:
-    details-default-dynamicenv-reconcile-flow:
+    reconcile-flow/details:
       subsetErrors:
         deployment:
           - error: 'couldn''t find the deployment we need to override (name: details,

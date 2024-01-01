@@ -9,9 +9,9 @@ status:
   totalCount: 1
   totalReady: 0
   subsetsStatus:
-    details-default-dynamicenv-global-virtual-service-errors:
+    global-virtual-service-errors/details:
       subsetErrors:
         virtualServices:
           - error: 'error updating virtual service for subset (details-default-dynamicenv-global-virtual-service-errors):
-                     could not find even one virtual service that handles subset "details-default-dynamicenv-global-virtual-service-errors"'
+                     could not find even one virtual service that handles subset "global-virtual-service-errors/details"'
 ...

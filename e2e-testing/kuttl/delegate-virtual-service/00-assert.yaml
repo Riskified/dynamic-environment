@@ -124,7 +124,7 @@ metadata:
   namespace: default
 status:
   subsetsStatus:
-    test-app-default-dynamicenv-delegate-virtual-service:
+    delegate-virtual-service/test-app:
       subsetErrors:
         virtualServices:
           - error: 'Wierd, Couldn''t find a service with name: does-not-exist-delegate,

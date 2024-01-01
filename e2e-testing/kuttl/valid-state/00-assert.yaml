@@ -4,7 +4,7 @@ metadata:
   name: dynamicenv-valid-state
 status:
   subsetsStatus:
-    details-default-dynamicenv-valid-state:
+    valid-state/details:
       deployment:
         name: details-default-dynamicenv-valid-state
         namespace: valid-state
