@@ -43,6 +43,8 @@ type DeploymentHandler struct {
 	UniqueName string
 	// The unique version of the deployment we need to handle
 	UniqueVersion string
+	// The name of the subset/consumer as it appears in the Status map
+	SubsetName string
 	// THe owner of the deployment we need to handle (e.g. to configure watches)
 	Owner types.NamespacedName
 	// The deployment we should use as base
@@ -89,7 +91,7 @@ func (h *DeploymentHandler) Handle() error {
 		if err != nil {
 			return fmt.Errorf("calculating hash for %q: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.UniqueName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash on deployment creation %q: %w", h.UniqueName, err)
 		}
 
@@ -146,24 +148,21 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 }
 
 func (h *DeploymentHandler) ApplyStatus(rs riskifiedv1alpha1.ResourceStatus) error {
-	return h.StatusHandler.AddDeploymentStatusEntry(h.UniqueName, rs, h.DeploymentType)
+	return h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, rs, h.DeploymentType)
 }
 
 func (h *DeploymentHandler) GetSubset() string {
-	return h.UniqueName
+	return h.SubsetName
 }
 
 func (h *DeploymentHandler) UpdateIfRequired() error {
 	h.Log.V(1).Info("Checking whether it's required to update subset", "subset namespace", h.Subset.Namespace, "subset name", h.Subset.Name)
-	// Trusting the webhook validator we assume the following:
-	// - Subset name/namespace can not be changed
-	// - Container and initContainer overrides must have the same names
 	s := h.Subset
 	var existingHash uint64
 	if h.DeploymentType == riskifiedv1alpha1.CONSUMER {
-		existingHash = h.StatusHandler.GetHashForConsumer(h.UniqueName)
+		existingHash = h.StatusHandler.GetHashForConsumer(h.SubsetName)
 	} else {
-		existingHash = h.StatusHandler.GetHashForSubset(h.UniqueName)
+		existingHash = h.StatusHandler.GetHashForSubset(h.SubsetName)
 	}
 	hash, err := hashstructure.Hash(h.Subset, hashstructure.FormatV2, nil)
 	if err != nil {
@@ -183,7 +182,7 @@ func (h *DeploymentHandler) UpdateIfRequired() error {
 			h.Log.Error(err, "Updating Subset", "subset full name", h.UniqueName)
 			return fmt.Errorf("error updating subset %s: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.UniqueName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash for '%s': %w", h.UniqueName, err)
 		}
 	}
@@ -260,7 +259,7 @@ func (h *DeploymentHandler) setStatus(status riskifiedv1alpha1.LifeCycleStatus) 
 		Namespace: h.Subset.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusHandler.AddDeploymentStatusEntry(h.UniqueName, currentState, h.DeploymentType); err != nil {
+	if err := h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, currentState, h.DeploymentType); err != nil {
 		return err
 	}
 	return nil

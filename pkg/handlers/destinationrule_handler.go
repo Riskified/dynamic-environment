@@ -42,6 +42,8 @@ type DestinationRuleHandler struct {
 	UniqueVersion string
 	// The namespace of the target DestinationRule
 	Namespace string
+	// The name of the subset/consumer as it appears in the Status map
+	SubsetName string
 	// The version label
 	VersionLabel string
 	// The version that gets the default route
@@ -119,7 +121,7 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 
 func (h *DestinationRuleHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusHandler.AddDestinationRuleStatusEntry(h.UniqueName, rs); err != nil {
+		if err := h.StatusHandler.AddDestinationRuleStatusEntry(h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -127,7 +129,7 @@ func (h *DestinationRuleHandler) ApplyStatus(statuses []riskifiedv1alpha1.Resour
 }
 
 func (h *DestinationRuleHandler) GetSubset() string {
-	return h.UniqueName
+	return h.SubsetName
 }
 
 func (h *DestinationRuleHandler) GetHosts() []string {
@@ -135,7 +137,7 @@ func (h *DestinationRuleHandler) GetHosts() []string {
 }
 
 func (h *DestinationRuleHandler) createMissingDestinationRule(destinationRuleName, serviceHost string) error {
-	if err := h.setStatus(h.UniqueName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
+	if err := h.setStatus(h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
 		return fmt.Errorf("failed to update status (prior to launching destination rule: %s): %w", serviceHost, err)
 	}
 	if err := h.createOverridingDestinationRule(destinationRuleName, serviceHost); err != nil {

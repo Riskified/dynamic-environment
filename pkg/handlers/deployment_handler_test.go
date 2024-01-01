@@ -203,6 +203,7 @@ var _ = Describe("DeploymentHandler", func() {
 			}
 			mc := struct{ MockClient }{}
 			handler := mkDeploymentHandler("details-default-dynamicenv-sample", de, mc)
+			handler.SubsetName = fmt.Sprintf("%s/%s", de.Spec.Subsets[0].Namespace, de.Spec.Subsets[0].Name)
 			subset := de.Spec.Subsets[0].DeepCopy()
 			handler.Subset = *subset
 			errorResult := handler.UpdateIfRequired()

@@ -157,14 +157,15 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			defaultVersionForSubset = s.DefaultVersion
 		}
 
+		subsetName := mkSubsetName(s)
 		baseDeployment := &appsv1.Deployment{}
 		err := r.Get(ctx, types.NamespacedName{Name: s.Name, Namespace: s.Namespace}, baseDeployment)
 		if err != nil {
 			log.Error(err, "couldn't find the deployment we need to override", "deployment-name", s.Name, "namespace", s.Namespace)
 			msg := fmt.Sprintf("couldn't find the deployment we need to override (name: %s, ns: %s)", s.Name, s.Namespace)
 			rls.returnError = fmt.Errorf("%s: %w", msg, err)
-			rls.addDeploymentMessage(uniqueName, st.Type, "%s, %v", msg, err)
-			rls.nonReadyCS[uniqueName] = true
+			rls.addDeploymentMessage(subsetName, st.Type, "%s, %v", msg, err)
+			rls.nonReadyCS[subsetName] = true
 			break
 		}
 
@@ -172,6 +173,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Client:         r.Client,
 			UniqueName:     uniqueName,
 			UniqueVersion:  uniqueVersion,
+			SubsetName:     subsetName,
 			Owner:          owner,
 			BaseDeployment: baseDeployment,
 			DeploymentType: st.Type,
@@ -186,7 +188,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		deploymentHandlers = append(deploymentHandlers, &deploymentHandler)
 		if err := deploymentHandler.Handle(); err != nil {
 			rls.returnError = err
-			rls.addDeploymentMessage(uniqueName, st.Type, err.Error())
+			rls.addDeploymentMessage(subsetName, st.Type, err.Error())
 			break
 		}
 
@@ -195,7 +197,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			if err != nil {
 				msg := fmt.Sprintf("locating service hostname for deployment '%s'", baseDeployment.Name)
 				rls.returnError = fmt.Errorf("%s: %w", msg, err)
-				rls.subsetMessages[uniqueName] = rls.subsetMessages[uniqueName].AppendGlobalMsg("%s: %v", msg, err)
+				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendGlobalMsg("%s: %v", msg, err)
 				break
 			}
 
@@ -204,6 +206,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				UniqueName:     uniqueName,
 				UniqueVersion:  uniqueVersion,
 				Namespace:      s.Namespace,
+				SubsetName:     subsetName,
 				VersionLabel:   r.VersionLabel,
 				DefaultVersion: defaultVersionForSubset,
 				StatusHandler:  &statusHandler,
@@ -215,7 +218,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			mrHandlers = append(mrHandlers, &destinationRuleHandler)
 			if err := destinationRuleHandler.Handle(); err != nil {
 				rls.returnError = err
-				rls.subsetMessages[uniqueName] = rls.subsetMessages[uniqueName].AppendDestinationRuleMsg(err.Error())
+				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendDestinationRuleMsg(err.Error())
 				break
 			}
 
@@ -225,6 +228,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				UniqueVersion:  uniqueVersion,
 				RoutePrefix:    helpers.CalculateVirtualServicePrefix(uniqueVersion, s.Name),
 				Namespace:      s.Namespace,
+				SubsetName:     subsetName,
 				ServiceHosts:   serviceHosts,
 				DefaultVersion: defaultVersionForSubset,
 				DynamicEnv:     dynamicEnv,
@@ -241,15 +245,15 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					log.Error(err, "error updating virtual service for subset", "subset", s.Name)
 					msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
 					rls.returnError = fmt.Errorf("%s: %w", msg, err)
-					rls.subsetMessages[uniqueName] = rls.subsetMessages[uniqueName].AppendVirtualServiceMsg("%s: %s", msg, err)
+					rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendVirtualServiceMsg("%s: %s", msg, err)
 				}
 			}
 
 			commonHostExists := helpers.CommonValueExists(destinationRuleHandler.GetHosts(), virtualServiceHandler.GetHosts())
 			if !commonHostExists {
 				degradedExists = true
-				rls.nonReadyCS[uniqueName] = true
-				rls.subsetMessages[uniqueName] = rls.subsetMessages[uniqueName].AppendGlobalMsg("Couldn't find common active service hostname across DestinationRules and VirtualServices")
+				rls.nonReadyCS[subsetName] = true
+				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendGlobalMsg("Couldn't find common active service hostname across DestinationRules and VirtualServices")
 			}
 		}
 	}
@@ -525,8 +529,8 @@ func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, version string, de *riskifiedv1alpha1.DynamicEnv) error {
 	var allSC = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for _, st := range subsetsAndConsumers {
-		uniqueName := mkSubsetUniqueName(st.Subset.Name, version)
-		allSC[uniqueName] = st.Type
+		subsetName := mkSubsetName(st.Subset)
+		allSC[subsetName] = st.Type
 	}
 	deletedSC := findDeletedSC(de, allSC)
 	for name, typ := range deletedSC {
@@ -702,4 +706,8 @@ func markedForDeletion(de *riskifiedv1alpha1.DynamicEnv) bool {
 
 func mkSubsetUniqueName(name, version string) string {
 	return name + "-" + version
+}
+
+func mkSubsetName(subset riskifiedv1alpha1.Subset) string {
+	return fmt.Sprintf("%s/%s", subset.Namespace, subset.Name)
 }
