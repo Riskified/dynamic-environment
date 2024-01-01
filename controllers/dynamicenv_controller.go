@@ -145,7 +145,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	subsetsAndConsumers := mergeSubsetsAndConsumers(dynamicEnv.Spec.Subsets, dynamicEnv.Spec.Consumers)
 
-	if err := r.cleanupRemovedSubsetsOrConsumers(ctx, subsetsAndConsumers, uniqueVersion, dynamicEnv); err != nil {
+	if err := r.cleanupRemovedSubsetsOrConsumers(ctx, subsetsAndConsumers, dynamicEnv); err != nil {
 		rls.cleanupError = err
 	}
 
@@ -526,7 +526,7 @@ func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // Cleanup subsets and consumers that are removed from the dynamic environment CRD.
-func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, version string, de *riskifiedv1alpha1.DynamicEnv) error {
+func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, de *riskifiedv1alpha1.DynamicEnv) error {
 	var allSC = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for _, st := range subsetsAndConsumers {
 		subsetName := mkSubsetName(st.Subset)
