@@ -7,7 +7,7 @@ metadata:
 status:
   state: degraded
   subsetsStatus:
-    details-default-dynamicenv-multiple-services-scenarios-n:
+    multiple-services-scenarios-no-vs/details:
       deployment:
         name: details-default-dynamicenv-multiple-services-scenarios-n
         namespace: multiple-services-scenarios-no-vs
@@ -22,7 +22,7 @@ status:
       subsetErrors:
         virtualServices:
         - error: 'error updating virtual service for subset (details-default-dynamicenv-multiple-services-scenarios-n):
-            could not find even one virtual service that handles subset "details-default-dynamicenv-multiple-services-scenarios-n"'
+            could not find even one virtual service that handles subset "multiple-services-scenarios-no-vs/details"'
   totalCount: 1
   totalReady: 0
 ...

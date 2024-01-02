@@ -8,12 +8,12 @@ status:
   totalCount: 3
   totalReady: 2
   consumersStatus:
-    details-worker-default-dynamicenv-consumers-with-and-without-er:
+    consumers-with-and-without-errors/details-worker:
       name: details-worker-default-dynamicenv-consumers-with-and-without-er
       namespace: consumers-with-and-without-errors
       status: running
       hash: -7893432429265961114
-    details-worker-invalid-default-dynamicenv-consumers-with-and-without-er:
+    consumers-with-and-without-errors/details-worker-invalid:
       errors:
         - error: 'couldn''t find the deployment we need to override (name: details-worker-invalid,
           ns: consumers-with-and-without-errors), Deployment.apps "details-worker-invalid"

@@ -69,7 +69,7 @@ metadata:
   namespace: default
 status:
   subsetsStatus:
-    details-default-dynamicenv-vs-with-multiple-services:
+    vs-with-multiple-services/details:
       virtualServices:
         - name: all-services
           namespace: vs-with-multiple-services

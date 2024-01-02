@@ -7,7 +7,7 @@ metadata:
 status:
   state: ready
   subsetsStatus:
-    details-default-dynamicenv-multiple-services-per-deploym:
+    multiple-services-per-deployment/details:
       deployment:
         name: details-default-dynamicenv-multiple-services-per-deploym
         namespace: multiple-services-per-deployment

@@ -36,9 +36,11 @@ import (
 // A handler for managing VirtualService manipulations.
 type VirtualServiceHandler struct {
 	client.Client
-	UniqueName     string
-	UniqueVersion  string
-	Namespace      string
+	UniqueName    string
+	UniqueVersion string
+	Namespace     string
+	// The name of the subset/consumer as it appears in the Status map
+	SubsetName     string
 	RoutePrefix    string
 	ServiceHosts   []string
 	DefaultVersion string
@@ -97,7 +99,7 @@ func (h *VirtualServiceHandler) GetStatus() ([]riskifiedv1alpha1.ResourceStatus,
 
 func (h *VirtualServiceHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.UniqueName, rs); err != nil {
+		if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -105,7 +107,7 @@ func (h *VirtualServiceHandler) ApplyStatus(statuses []riskifiedv1alpha1.Resourc
 }
 
 func (h *VirtualServiceHandler) GetSubset() string {
-	return h.UniqueName
+	return h.SubsetName
 }
 
 func (h *VirtualServiceHandler) GetHosts() []string {
@@ -164,7 +166,7 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.De
 		}
 	}
 	msg := fmt.Sprintf("Wierd, Couldn't find a service with name: %s, namespace: %s, in the service list", delegate.Name, delegate.Namespace)
-	if err := h.StatusHandler.AddGlobalVirtualServiceError(h.UniqueName, msg); err != nil {
+	if err := h.StatusHandler.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
 		h.Log.Error(err, "failed to write the following message to status: "+msg)
 	}
 	h.Log.Info(msg)
@@ -174,7 +176,7 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.De
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("Delegate (%s/%s) not found", delegate.Namespace, delegate.Name)
 			h.Log.V(0).Info(msg)
-			if err = h.StatusHandler.AddGlobalVirtualServiceError(h.UniqueName, msg); err != nil {
+			if err = h.StatusHandler.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
 				h.Log.Error(err, "Error writing virtual service status regarding delegate", "delegate", delegate)
 			}
 			return nil, nil
@@ -198,7 +200,7 @@ func (h *VirtualServiceHandler) updateVirtualService(serviceHost string, service
 
 	// Add this service to status
 	newStatus := riskifiedv1alpha1.ResourceStatus{Name: service.Name, Namespace: service.Namespace}
-	if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.UniqueName, newStatus); err != nil {
+	if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.SubsetName, newStatus); err != nil {
 		h.Log.Error(err, "error updating state for virtual service")
 		return err
 	}

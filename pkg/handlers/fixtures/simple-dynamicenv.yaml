@@ -18,5 +18,5 @@ spec:
             value: test
 status:
   subsetsStatus:
-    details-default-dynamicenv-sample:
+    services/details:
       hash: 1157382594159137535

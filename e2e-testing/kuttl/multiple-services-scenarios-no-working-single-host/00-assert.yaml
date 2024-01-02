@@ -21,7 +21,7 @@ spec:
 status:
   state: degraded
   subsetsStatus:
-    details-default-dynamicenv-multiple-services-scenarios-n:
+    multiple-services-scenarios-no-working-single-host/details:
       deployment:
         name: details-default-dynamicenv-multiple-services-scenarios-n
         namespace: multiple-services-scenarios-no-working-single-host

@@ -19,7 +19,7 @@ metadata:
   name: dynamicenv-update-subset-resources
 status:
   subsetsStatus:
-    details-default-dynamicenv-update-subset-resources:
+    update-subset-resources/details:
       hash: 3856039101763933687
       deployment:
         name: details-default-dynamicenv-update-subset-resources

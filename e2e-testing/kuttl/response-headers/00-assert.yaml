@@ -126,7 +126,7 @@ metadata:
   namespace: default
 status:
   subsetsStatus:
-    test-app-default-dynamicenv-response-headers:
+    response-headers/test-app:
       virtualServices:
         - name: test-app-vs
           namespace: response-headers-2
