@@ -5,3 +5,4 @@ operator-sdk 1.28.0
 kind 0.18.0
 istioctl 1.17.2
 golangci-lint 1.53.2
+yq 4.40.5
