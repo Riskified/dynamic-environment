@@ -120,7 +120,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	uniqueVersion := helpers.UniqueDynamicEnvName(dynamicEnv)
 	resourceName := fmt.Sprintf("%s/%s", dynamicEnv.Namespace, dynamicEnv.Name)
-	log = log.WithValues("resource", resourceName)
+	log := log.WithValues("resource", resourceName)
 
 	if markedForDeletion(dynamicEnv) {
 		return r.cleanDynamicEnvResources(ctx, dynamicEnv)
