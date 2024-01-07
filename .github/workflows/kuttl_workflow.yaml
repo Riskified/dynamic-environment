@@ -50,8 +50,8 @@ jobs:
         env:
           KIND_CLUSTER_NAME: kuttl
       # Uncomment the next step to access a shell on github actions.
-      #      - name: tmate debug session
-      #        uses: mxschmitt/action-tmate@v3
+      - name: tmate debug session
+        uses: mxschmitt/action-tmate@v3
       - name: Run kuttl tests
         run: |
           # Let the system enough time to start
