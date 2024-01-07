@@ -37,6 +37,7 @@ const (
 	Failed           LifeCycleStatus = "failed"
 	Missing          LifeCycleStatus = "missing"
 	Updating         LifeCycleStatus = "updating"
+	Removing         LifeCycleStatus = "removing"
 	IgnoredMissingDR LifeCycleStatus = "ignored-missing-destination-rule"
 	IgnoredMissingVS LifeCycleStatus = "ignored-missing-virtual-service"
 
@@ -65,12 +66,15 @@ func (s LifeCycleStatus) String() string {
 		return string(Missing)
 	case Updating:
 		return string(Updating)
+	case Removing:
+		return string(Removing)
 	case IgnoredMissingDR:
 		return string(IgnoredMissingDR)
 	case IgnoredMissingVS:
 		return string(IgnoredMissingVS)
+	default:
+		return defaultResult
 	}
-	return defaultResult
 }
 
 func ParseLifeCycleStatus(s string) LifeCycleStatus {
@@ -85,6 +89,8 @@ func ParseLifeCycleStatus(s string) LifeCycleStatus {
 		return Missing
 	case string(Updating):
 		return Updating
+	case string(Removing):
+		return Removing
 	case string(IgnoredMissingDR):
 		return IgnoredMissingDR
 	case string(IgnoredMissingVS):
@@ -118,8 +124,9 @@ func (s *GlobalReadyStatus) String() string {
 		return string(Processing)
 	case Ready:
 		return string(Ready)
+	default:
+		return string(Processing)
 	}
-	return string(Processing)
 }
 
 func ParseGlobalReadyStatus(s string) GlobalReadyStatus {

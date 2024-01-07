@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - command: echo "validating only single subset in the status:"
+  - script: kubectl -n $NAMESPACE get dynamicenv dynamicenv-add-remove-subsets -o yaml | yq -e '.status.subsetsStatus | length == 1'
+  - command: echo "validating no consumer status exists:"
+  - script: kubectl -n $NAMESPACE get dynamicenv dynamicenv-add-remove-subsets -o yaml | yq -e '.status | has ("consumersStatus") == false'

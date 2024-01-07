@@ -8,5 +8,4 @@ This test validates we can add and remove subsets and consumers at will. Workflo
 
 (other steps are for validation).
 
-> Note: Currently in Kuttl I can not verify that a subset *does not* exist in the status. Consider
-> adding `TestAssert` with `Command` to somehow verify this (or use other means to verify).
+Using `yq` to validate that removed subsets/consumer does not exist in the status after removal.
