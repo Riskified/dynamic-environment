@@ -55,6 +55,7 @@ type DynamicEnvReconciler struct {
 type ReconcileLoopStatus struct {
 	returnError      error
 	cleanupError     error
+	cleanupProgress  bool
 	subsetMessages   map[string]riskifiedv1alpha1.SubsetMessages
 	consumerMessages map[string][]string
 	// Non ready consumers and subsets
@@ -145,9 +146,11 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	subsetsAndConsumers := mergeSubsetsAndConsumers(dynamicEnv.Spec.Subsets, dynamicEnv.Spec.Consumers)
 
-	if err := r.cleanupRemovedSubsetsOrConsumers(ctx, subsetsAndConsumers, dynamicEnv); err != nil {
+	inProgress, err := r.cleanupRemovedSubsetsOrConsumers(ctx, subsetsAndConsumers, dynamicEnv)
+	if err != nil {
 		rls.cleanupError = err
 	}
+	rls.cleanupProgress = inProgress
 
 	for _, st := range subsetsAndConsumers {
 		s := st.Subset
@@ -306,6 +309,9 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if rls.cleanupProgress {
+		nonReadyExists = true
+	}
 	globalState := riskifiedv1alpha1.Processing
 	if !nonReadyExists {
 		globalState = riskifiedv1alpha1.Ready
@@ -526,7 +532,7 @@ func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // Cleanup subsets and consumers that are removed from the dynamic environment CRD.
-func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, de *riskifiedv1alpha1.DynamicEnv) error {
+func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Context, subsetsAndConsumers []SubsetType, de *riskifiedv1alpha1.DynamicEnv) (inProgress bool, _ error) {
 	var allSC = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for _, st := range subsetsAndConsumers {
 		subsetName := mkSubsetName(st.Subset)
@@ -535,57 +541,60 @@ func (r *DynamicEnvReconciler) cleanupRemovedSubsetsOrConsumers(ctx context.Cont
 	deletedSC := findDeletedSC(de, allSC)
 	for name, typ := range deletedSC {
 		if typ == riskifiedv1alpha1.CONSUMER {
-			if err := r.cleanupConsumer(ctx, name, de); err != nil {
-				if errors.IsConflict(err) {
-					log.Info("Ignoring conflict removing consumer", "consumer", name)
-				} else {
-					log.Error(err, "cleanup removed consumer")
-					return fmt.Errorf("cleanup removed consumer: %w", err)
-				}
+			processing, err := r.cleanupConsumer(ctx, name, de)
+			if err != nil {
+				log.Error(err, "cleanup removed consumer")
+				return processing, fmt.Errorf("cleanup removed consumer: %w", err)
+			}
+			if processing {
+				inProgress = true
 			}
 		} else {
-			if err := r.cleanupSubset(ctx, name, de); err != nil {
-				if errors.IsConflict(err) {
-					log.Info("Ignoring conflict removing subset", "subset", name)
-				} else {
-					log.Error(err, "cleanup removed subset")
-					return fmt.Errorf("cleanup removed subset: %w", err)
-				}
+			processing, err := r.cleanupSubset(ctx, name, de)
+			if err != nil {
+				log.Error(err, "cleanup removed subset")
+				return processing, fmt.Errorf("cleanup removed subset: %w", err)
+			}
+			if processing {
+				inProgress = true
 			}
 		}
 	}
 
-	return nil
+	return inProgress, nil
 }
 
 // searches for `name` in the consumersStatus and delete it. If not found deletes from status
-func (r *DynamicEnvReconciler) cleanupConsumer(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) error {
+func (r *DynamicEnvReconciler) cleanupConsumer(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) (processing bool, err error) {
 	st, ok := de.Status.ConsumersStatus[name]
 	if ok {
 		// todo delete resources
 		found, err := r.deleteDeployment(ctx, st.ResourceStatus)
 		if err != nil {
-			return fmt.Errorf("deleting removed consumer: %w", err)
+			return true, fmt.Errorf("deleting removed consumer: %w", err)
 		}
-		if !found {
+		if found {
+			status := de.Status.ConsumersStatus[name]
+			status.Status = riskifiedv1alpha1.Removing
+			de.Status.ConsumersStatus[name] = status
+			return true, r.Status().Update(ctx, de)
+		} else {
 			delete(de.Status.ConsumersStatus, name)
-			if err := r.Status().Update(ctx, de); err != nil {
-				return fmt.Errorf("deleting removed consumer status: %w", err)
-			}
+			return false, r.Status().Update(ctx, de)
 		}
 	}
 	log.V(1).Info("Consumer cleanup finished", "consumer", name)
-	return nil
+	return false, nil
 }
 
 // searches for `name` in the subsetsStatus and delete it. If not found deletes from status
-func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) error {
+func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, de *riskifiedv1alpha1.DynamicEnv) (processing bool, err error) {
 	st, ok := de.Status.SubsetsStatus[name]
 	exists := false
 	if ok {
 		found, err := r.deleteDeployment(ctx, st.Deployment)
 		if err != nil {
-			return fmt.Errorf("deleting deployment from removed subset: %w", err)
+			return true, fmt.Errorf("deleting deployment from removed subset: %w", err)
 		}
 		if found {
 			exists = found
@@ -593,7 +602,7 @@ func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, d
 		for _, dr := range st.DestinationRules {
 			found, err := r.deleteDestinationRule(ctx, dr)
 			if err != nil {
-				return fmt.Errorf("deleting destination rule from removed subset: %w", err)
+				return true, fmt.Errorf("deleting destination rule from removed subset: %w", err)
 			}
 			if found {
 				exists = found
@@ -601,18 +610,19 @@ func (r *DynamicEnvReconciler) cleanupSubset(ctx context.Context, name string, d
 		}
 		for _, vs := range st.VirtualServices {
 			if err := r.cleanupVirtualService(ctx, vs, de); err != nil {
-				return fmt.Errorf("cleaning virtual servive from removed subset routes: %w", err)
+				return true, fmt.Errorf("cleaning virtual servive from removed subset routes: %w", err)
 			}
 		}
 	}
-	if !exists {
+	if exists {
+		status := de.Status.SubsetsStatus[name]
+		status.Deployment.Status = riskifiedv1alpha1.Removing
+		de.Status.SubsetsStatus[name] = status
+		return true, r.Status().Update(ctx, de)
+	} else {
 		delete(de.Status.SubsetsStatus, name)
-		if err := r.Status().Update(ctx, de); err != nil {
-			return fmt.Errorf("deleting removed subset status: %w", err)
-		}
+		return false, r.Status().Update(ctx, de)
 	}
-	log.V(1).Info("Subset cleanup finished", "subset", name)
-	return nil
 }
 
 func (r *DynamicEnvReconciler) deleteDeployment(ctx context.Context, deployment riskifiedv1alpha1.ResourceStatus) (found bool, err error) {
