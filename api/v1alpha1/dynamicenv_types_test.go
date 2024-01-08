@@ -36,6 +36,7 @@ var _ = Describe("Life Cycle Status", func() {
 		Entry("failed status", riskifiedv1alpha1.Failed, "failed"),
 		Entry("missing (not running)", riskifiedv1alpha1.Missing, "missing"),
 		Entry("updating status", riskifiedv1alpha1.Updating, "updating"),
+		Entry("removing status", riskifiedv1alpha1.Removing, "removing"),
 		Entry("ignored missing destination rule", riskifiedv1alpha1.IgnoredMissingDR, "ignored-missing-destination-rule"),
 		Entry("ignored missing virtual service", riskifiedv1alpha1.IgnoredMissingVS, "ignored-missing-virtual-service"),
 	)
@@ -123,6 +124,7 @@ var _ = Describe("Global Ready Status", func() {
 		Entry("updating is not failed", riskifiedv1alpha1.Updating, false),
 		Entry("running is not failed", riskifiedv1alpha1.Running, false),
 		Entry("unknown is not failed", riskifiedv1alpha1.Unknown, false),
+		Entry("removing is not failed", riskifiedv1alpha1.Removing, false),
 		Entry("ignored missing DR is not failed", riskifiedv1alpha1.IgnoredMissingDR, false),
 		Entry("ignored missing VS is not failed", riskifiedv1alpha1.IgnoredMissingVS, false),
 		Entry("missing is failed", riskifiedv1alpha1.Missing, true),
