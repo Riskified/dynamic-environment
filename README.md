@@ -1,12 +1,25 @@
-# Dynamic Environment Controller <img src="https://riskified.github.io/dynamic-environment-docs/img/de-logo.svg" alt="Dynamic Environment Logo" width="20">
+<p align="center"><img src="images/DynamicEnv-logo.png" width="200"/></p>
+<p style="font-size: 40px" align="center"><b>Dynamic Environment</b></p>
 
-A k8s operator which supports testing on a multi-test workflows environment in a
-transparent way. This operator will listen to DynamicEnv, a new Riskified custom resource.
-In this resource we will configure the services from which we want to create a subset with new version of our app 
-and apply all the requirements for routing the requests to the matching subsets.
-Ready to get started? Check out the [docs](https://riskified.github.io/dynamic-environment-docs/).
+<p align="center">
+  <a href="https://github.com/Riskified/dynamic-environment/actions?query=workflow%3Amain-build"><img src="https://github.com/Riskified/dynamic-environment/actions/workflows/docker.yaml/badge.svg" alt="main build"></a>
+  <a href="https://github.com/Riskified/dynamic-environment/releases/latest"><img src="https://img.shields.io/github/v/release/Riskified/dynamic-environment.svg" alt="GitHub release"></a>
+  <a href="http://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
+</p>
 
-## Setting Development Environment
+DynamicEnv is an innovative Kubernetes operator designed to empower developers by simplifying the process of launching on-demand environments. At its core, DynamicEnv offers a streamlined approach to deploying and testing different versions of specific services within a shared Kubernetes cluster.
+
+It effectively deals with the issues mentioned by creating special versions just for the services being tested. At the same time, it makes smart use of the 'production' versions for the rest of the environment, ensuring efficient resource use. The traffic is cleverly directed, sending 'real' users to the 'production' version of services and directing the traffic of a test user to the specific test version.
+
+<p align="center"><img src="images/de-in-action.png"/></p>
+
+<p align="center">
+  <br />
+  <a href="https://riskified.github.io/dynamic-environment-docs/" rel="dofollow"><strong>Explore the docs »</strong></a>
+  <br />
+</p>
+
+## Development Setup
 
 This section describes how to create a working environment for developing _Dynamic Environment_.
 While it's not mandatory to follow these instructions or use the same tools, it's highly recommended
@@ -46,7 +59,7 @@ Here are other tools, that while not required, can make life easier:
 * `k9s`: A great tool for interacting with k8s from the command line. Check the [website][k9s] for
   usage.
 
-## Prepare task
+### Prepare task
 
 Some of the development requirements are installed via the `Makefile`'s `prepare` task. Run it to
 install requirements:
@@ -55,14 +68,14 @@ install requirements:
 make prepare
 ```
 
-### Kubernetes Setup for Development and Testing
+## Setting up Kubernetes
 
 After we have the tools we need, it's time to install two kubernetes clusters. One for Development and one for
 running tests locally. Below is an optional suggestion for installing and configuring these
 clusters. Feel free to replace all the components except _KInd_ (so your test setup will be as
 similar to the _CI_ as possible).
 
-#### Development Cluster
+### Development Cluster
 
 We will use [minikube][] as our development cluster. Feel free to use whichever cluster suits you
 best, but try to preserve the kubernetes version.
