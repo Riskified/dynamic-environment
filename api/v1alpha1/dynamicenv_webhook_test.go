@@ -28,6 +28,7 @@ import (
 )
 
 var zeroReplicas int32 = 0
+var oneReplica int32 = 1
 
 func mkDynamicEnvFromYamlFile(fileName string) (de DynamicEnv, err error) {
 	sourceFile, err := os.Open(fileName)
@@ -354,6 +355,151 @@ var _ = Describe("Validating Webhook", func() {
 				},
 				"0 replicas",
 			),
+			Entry(
+				"duplicate deployment in subsets",
+				&DynamicEnv{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-de",
+						Namespace: "default",
+					},
+					Spec: DynamicEnvSpec{
+						IstioMatches: []IstioMatch{
+							{
+								Headers: map[string]StringMatch{
+									"name": {
+										Exact: "my_name",
+									},
+								},
+							},
+						},
+						Consumers: nil,
+						Subsets: []Subset{
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+						},
+					},
+				},
+				"appears in more then one subset/consumer",
+			),
+			Entry(
+				"duplicate deployment in consumers",
+				&DynamicEnv{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-de",
+						Namespace: "default",
+					},
+					Spec: DynamicEnvSpec{
+						IstioMatches: []IstioMatch{
+							{
+								Headers: map[string]StringMatch{
+									"name": {
+										Exact: "my_name",
+									},
+								},
+							},
+						},
+						Subsets: nil,
+						Consumers: []Subset{
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+						},
+					},
+				},
+				"appears in more then one subset/consumer",
+			),
+			Entry(
+				"duplicate deployment between subsets and consumers",
+				&DynamicEnv{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-de",
+						Namespace: "default",
+					},
+					Spec: DynamicEnvSpec{
+						IstioMatches: []IstioMatch{
+							{
+								Headers: map[string]StringMatch{
+									"name": {
+										Exact: "my_name",
+									},
+								},
+							},
+						},
+						Subsets: []Subset{
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+						},
+						Consumers: []Subset{
+							{
+								Name:           "somename",
+								Namespace:      "ns",
+								Replicas:       &oneReplica,
+								DefaultVersion: "version",
+								Containers: []ContainerOverrides{
+									{
+										ContainerName: "main",
+										Image:         "image",
+									},
+								},
+							},
+						},
+					},
+				},
+				"appears in more then one subset/consumer",
+			),
 		)
 
 		DescribeTable(
@@ -460,6 +606,12 @@ var _ = Describe("Validating Webhook", func() {
 				"fixtures/disallowed-modifications-modifying-to-zero-replicas-old.yaml",
 				"fixtures/disallowed-modifications-modifying-to-zero-replicas-new.yaml",
 				"0 replicas",
+			),
+			Entry(
+				"Sharing deployment between subsets/consumers",
+				"fixtures/disallowed-modifications-using-same-deployment-in-subset-and-consumer-old.yaml",
+				"fixtures/disallowed-modifications-using-same-deployment-in-subset-and-consumer-new.yaml",
+				"appears in more then one subset/consumer",
 			),
 		)
 	})

@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"k8s.io/utils/strings/slices"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -142,6 +143,10 @@ func (de *DynamicEnv) validateSubsetsProperties() error {
 			return field.Invalid(field.NewPath("spec").Child("Subsets").Key(s.Name).Child("initContainers"), s.InitContainers, msg)
 		}
 	}
+	if err := validateNoDuplicateDeployment(subsets); err != nil {
+		msg := "It seems that the following deployment appears in more then one subset/consumer: " + err.Error()
+		return field.Invalid(field.NewPath("spec"), de.Spec, msg)
+	}
 	return nil
 }
 
@@ -233,4 +238,16 @@ func validateUniqueContainerNames(containers []ContainerOverrides) bool {
 		m[c.ContainerName] = true
 	}
 	return len(m) == len(containers)
+}
+
+func validateNoDuplicateDeployment(subsets []Subset) error {
+	var uniques []string
+	for _, s := range subsets {
+		combined := fmt.Sprintf("%s/%s", s.Namespace, s.Name)
+		if slices.Contains(uniques, combined) {
+			return fmt.Errorf("%s", combined)
+		}
+		uniques = append(uniques, combined)
+	}
+	return nil
 }
