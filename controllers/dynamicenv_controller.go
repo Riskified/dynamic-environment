@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/strings/slices"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -349,12 +350,12 @@ func findDeletedSC(de *riskifiedv1alpha1.DynamicEnv, allSC map[string]riskifiedv
 	}
 	var removed = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for name := range de.Status.ConsumersStatus {
-		if !helpers.StringSliceContains(name, keys) {
+		if !slices.Contains(keys, name) {
 			removed[name] = riskifiedv1alpha1.CONSUMER
 		}
 	}
 	for name := range de.Status.SubsetsStatus {
-		if !helpers.StringSliceContains(name, keys) {
+		if !slices.Contains(keys, name) {
 			removed[name] = riskifiedv1alpha1.SUBSET
 		}
 	}
@@ -408,7 +409,7 @@ func (r *DynamicEnvReconciler) addFinalizersIfRequired(ctx context.Context, de *
 
 func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv) (ctrl.Result, error) {
 	log.Info("Dynamic Env marked for deletion, cleaning up ...")
-	if helpers.StringSliceContains(names.DeleteDeployments, de.Finalizers) {
+	if slices.Contains(de.Finalizers, names.DeleteDeployments) {
 		count, err := r.cleanupDeployments(ctx, de)
 		if err != nil {
 			log.Error(err, "error removing cleanupDeployments finalizer")
@@ -420,7 +421,7 @@ func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de 
 			}
 		}
 	}
-	if helpers.StringSliceContains(names.DeleteDestinationRules, de.Finalizers) {
+	if slices.Contains(de.Finalizers, names.DeleteDestinationRules) {
 		count, err := r.cleanupDestinationRules(ctx, de)
 		if err != nil {
 			log.Error(err, "error removing DeleteDestinationRules finalizer")
@@ -432,7 +433,7 @@ func (r *DynamicEnvReconciler) cleanDynamicEnvResources(ctx context.Context, de 
 			}
 		}
 	}
-	if helpers.StringSliceContains(names.CleanupVirtualServices, de.Finalizers) {
+	if slices.Contains(de.Finalizers, names.CleanupVirtualServices) {
 		if err := r.cleanupVirtualServices(ctx, de); err != nil {
 			log.Error(err, "error removing CleanupVirtualServices finalizer")
 			return ctrl.Result{}, err

@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/go-logr/logr"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
@@ -104,7 +105,7 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 		drName := h.calculateDRName(sh)
 		if err := h.Get(h.Ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
 			if errors.IsNotFound(err) {
-				if helpers.StringSliceContains(sh, h.ignoredMissing) {
+				if slices.Contains(h.ignoredMissing, sh) {
 					statuses = append(statuses, genStatus(drName, riskifiedv1alpha1.IgnoredMissingDR))
 					continue
 				}
