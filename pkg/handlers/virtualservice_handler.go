@@ -62,15 +62,15 @@ func (h *VirtualServiceHandler) Handle() error {
 			return err
 		}
 		h.virtualServices[serviceHost] = toNamespacedName(services)
-		var atLeastOneVSPerHostnameExists = false
+		var atLeastOneVirtualServicePerHostnameExists = false
 		for _, service := range services {
-			if err := h.updateVirtualService(serviceHost, service); err != nil {
+			if err := h.updateVirtualService(service, serviceHost); err != nil {
 				h.Log.Info("error updating virtual service", "service-host", serviceHost, "error", err.Error())
 				continue
 			}
-			atLeastOneVSPerHostnameExists = true
+			atLeastOneVirtualServicePerHostnameExists = true
 		}
-		if atLeastOneVSPerHostnameExists {
+		if atLeastOneVirtualServicePerHostnameExists {
 			h.activeHosts = append(h.activeHosts, serviceHost)
 		}
 	}
@@ -160,7 +160,7 @@ func (h *VirtualServiceHandler) resolveVirtualServices(serviceHost string, servi
 		if r.Delegate != nil {
 			delegated = append(delegated, r.Delegate)
 		}
-		if h.hasMatchingHostAndSubset(serviceHost, r.Route, service.Namespace) {
+		if h.routeDestinationsMatchesServiceHost(serviceHost, r.Route, service.Namespace) {
 			useSelf = true
 		}
 	}
@@ -195,18 +195,18 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.De
 	return s, nil
 }
 
-func (h *VirtualServiceHandler) updateVirtualService(serviceHost string, service *istionetwork.VirtualService) error {
+func (h *VirtualServiceHandler) updateVirtualService(service *istionetwork.VirtualService, serviceHost string) error {
 	h.Log.Info("Updating virtual service to route to version", "virtual-service", service.Name, "version", h.UniqueVersion)
 	owner := types.NamespacedName{Name: h.DynamicEnv.Name, Namespace: h.DynamicEnv.Namespace}
 	prefix := h.RoutePrefix
 
-	// TODO: Might not be relevant in multiple services
-	if containsDynamicEnvRoutes(service.Spec.Http, prefix) {
+	// TODO: This is currently a shortcoming. We'll see whether there's a need to enable that (a single virtual service
+	//       that serves multiple service hosts).
+	if routesConfiguredWithDynamicEnvRoutes(service.Spec.Http, prefix) {
 		h.Log.Info("Skipping virtual service that already contains dynamic-environment routes", "virtual-service", service.Name)
 		return nil
 	}
 
-	// Add this service to status
 	newStatus := riskifiedv1alpha1.ResourceStatus{Name: service.Name, Namespace: service.Namespace}
 	if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.SubsetName, newStatus); err != nil {
 		h.Log.Error(err, "error updating state for virtual service")
@@ -217,13 +217,12 @@ func (h *VirtualServiceHandler) updateVirtualService(serviceHost string, service
 	for _, r := range service.Spec.Http {
 		if strings.HasPrefix(r.Name, prefix) {
 			// We never use our old definitions, we're always acting from scratch
-			// TODO: Not relevant in multiple services
 			continue
 		}
-		if h.hasMatchingHostAndSubset(serviceHost, r.Route, service.Namespace) {
+		if h.routeDestinationsMatchesServiceHost(serviceHost, r.Route, service.Namespace) {
 			for _, match := range h.DynamicEnv.Spec.IstioMatches {
 				ourSubsetRoute := r.DeepCopy()
-				if err := h.updateRouteForSubset(serviceHost, ourSubsetRoute, match, service.Namespace); err != nil {
+				if err := h.populateRouteWithSubsetData(ourSubsetRoute, serviceHost, match, service.Namespace); err != nil {
 					h.Log.Error(err, "Adopting rule for dynamic environment")
 					return err
 				}
@@ -252,34 +251,32 @@ func (h *VirtualServiceHandler) getStatusForService(vs *istionetwork.VirtualServ
 		}
 	}
 
-	// TODO: is this even possible? we validate existing routes when selecting virtual services...
-	if containsDynamicEnvRoutes(vs.Spec.Http, h.RoutePrefix) {
+	if routesConfiguredWithDynamicEnvRoutes(vs.Spec.Http, h.RoutePrefix) {
 		return genStatus(riskifiedv1alpha1.Running)
 	} else {
 		return genStatus(riskifiedv1alpha1.IgnoredMissingVS)
 	}
 }
 
+// Populates the provided HTTPRoute with provided (and configured) data.
 // Note: the `inNamespace` parameter is the namespace to search for if the destination is not fully
 // qualified (e.g.the namespace which contains the virtual service we're updating).
-func (h *VirtualServiceHandler) updateRouteForSubset(serviceHost string, route *istioapi.HTTPRoute, match riskifiedv1alpha1.IstioMatch, inNamespace string) error {
-	newDestinations := h.filterDestinationByHostAndSubset(serviceHost, route.Route, inNamespace)
-	if len(newDestinations) == 0 {
+func (h *VirtualServiceHandler) populateRouteWithSubsetData(route *istioapi.HTTPRoute, serviceHost string, match riskifiedv1alpha1.IstioMatch, inNamespace string) error {
+	newRouteDestinations := h.filterRouteDestinationByHost(route.Route, serviceHost, inNamespace)
+	if len(newRouteDestinations) == 0 {
 		return IgnoredMissing{}
 	}
-	for _, d := range newDestinations {
-		d.Destination.Subset = h.UniqueVersion
-		d.Weight = 0
-		if d.Headers == nil {
-			d.Headers = &istioapi.Headers{}
+	for _, rd := range newRouteDestinations {
+		rd.Destination.Subset = h.UniqueVersion
+		rd.Weight = 0
+		if rd.Headers == nil {
+			rd.Headers = &istioapi.Headers{}
 		}
-		safeApplyResponseHeaders(d.Headers, "x-dynamic-env", h.UniqueName)
+		safeApplyResponseHeaders(rd.Headers, "x-dynamic-env", h.UniqueName)
 	}
-	route.Route = newDestinations
+	route.Route = newRouteDestinations
 
 	if len(route.Match) == 0 {
-		// if we're handling default route than match is empty, however we need at
-		// least one match for merging out rules into
 		route.Match = []*istioapi.HTTPMatchRequest{{}}
 	}
 	for _, m := range route.Match {
@@ -308,7 +305,8 @@ func (h *VirtualServiceHandler) updateRouteForSubset(serviceHost string, route *
 	return nil
 }
 
-func containsDynamicEnvRoutes(routes []*istioapi.HTTPRoute, prefix string) bool {
+// A helper to checks whether any of the provided routes are already populated with DynamicEnv data.
+func routesConfiguredWithDynamicEnvRoutes(routes []*istioapi.HTTPRoute, prefix string) bool {
 	for _, r := range routes {
 		if strings.HasPrefix(r.Name, prefix) {
 			return true
@@ -317,10 +315,10 @@ func containsDynamicEnvRoutes(routes []*istioapi.HTTPRoute, prefix string) bool 
 	return false
 }
 
-// A helper to check if any of the provided routes has the serviceHost and namespace configured in
-// our handler. The `inNamespace` parameter is the namespace to search if the `host` parameter is
-// not fully qualified (e.g. the namespace of the virtual service).
-func (h *VirtualServiceHandler) hasMatchingHostAndSubset(serviceHost string, routes []*istioapi.HTTPRouteDestination, inNamespace string) bool {
+// A helper to check if any of the provided route-destinations has a serviceHost and namespace matching the provided
+// ones. The `inNamespace` parameter is the namespace to search if the `host` parameter is not fully qualified (e.g. the
+// namespace of the virtual service).
+func (h *VirtualServiceHandler) routeDestinationsMatchesServiceHost(serviceHost string, routes []*istioapi.HTTPRouteDestination, inNamespace string) bool {
 	for _, route := range routes {
 		dest := route.Destination
 		if helpers.MatchNamespacedHost(serviceHost, h.Namespace, dest.Host, inNamespace) && dest.Subset == h.DefaultVersion {
@@ -330,9 +328,10 @@ func (h *VirtualServiceHandler) hasMatchingHostAndSubset(serviceHost string, rou
 	return false
 }
 
-// Note: the `inNamespace` parameter is the namespace to search for if the destination is not fully
-// qualified (e.g.the namespace which contains the virtual service we're processing).
-func (h *VirtualServiceHandler) filterDestinationByHostAndSubset(serviceHost string, destinations []*istioapi.HTTPRouteDestination, inNamespace string) []*istioapi.HTTPRouteDestination {
+// Select only the route-destinations that matches the provided hostname and namespace.
+// Note: the `inNamespace` parameter is the namespace to search for if the destination is not fully qualified (e.g.the
+// namespace which contains the virtual service we're processing).
+func (h *VirtualServiceHandler) filterRouteDestinationByHost(destinations []*istioapi.HTTPRouteDestination, serviceHost string, inNamespace string) []*istioapi.HTTPRouteDestination {
 	var newDestinations []*istioapi.HTTPRouteDestination
 
 	for _, d := range destinations {
