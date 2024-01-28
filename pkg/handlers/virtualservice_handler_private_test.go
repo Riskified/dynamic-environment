@@ -22,11 +22,18 @@ package handlers
 // functionality :) ).
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
+	"github.com/riskified/dynamic-environment/pkg/helpers"
+	"istio.io/api/networking/v1alpha3"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	istioapi "istio.io/api/networking/v1alpha3"
@@ -223,4 +230,128 @@ var _ = Describe("VirtualService with Delegates", func() {
 			true,
 		),
 	)
+})
+
+var _ = Describe("VirtualServiceHandler", func() {
+	Context("GetStatus", func() {
+		mkVirtualServiceHandler := func(name, ns, version, prefix string, c client.Client) VirtualServiceHandler {
+			return VirtualServiceHandler{
+				Client:         c,
+				UniqueName:     name,
+				Namespace:      ns,
+				UniqueVersion:  version,
+				DefaultVersion: "shared",
+				RoutePrefix:    prefix,
+				Log:            ctrl.Log,
+			}
+		}
+
+		It("returns empty result if no virtual service found", func() {
+			// TODO: How do we behave here? It should probably return error...
+			Skip("We need to think this over")
+			mc := struct{ MockClient }{}
+			handler := mkVirtualServiceHandler("unique", "ns", "_version", "_prefix", mc)
+			var expected []riskifiedv1alpha1.ResourceStatus
+			result, err := handler.GetStatus()
+			Expect(err).To(BeNil())
+			Expect(result).To(Equal(expected))
+		})
+
+		It("returns 'ignored-missing-virtual-service' for virtual services that does not contain our routes", func() {
+			serviceName := "my-service-host"
+			mc := struct{ MockClient }{}
+			mc.getMethod = func(_ context.Context, nn types.NamespacedName, o client.Object, _ ...client.GetOption) error {
+				if nn.Name == "service" && nn.Namespace == "ns" {
+					t := o.(*istionetwork.VirtualService)
+					t.Name = "service"
+					t.Namespace = "ns"
+					t.Spec.Hosts = []string{serviceName}
+					t.Spec.Http = []*v1alpha3.HTTPRoute{
+						{
+							Route: []*v1alpha3.HTTPRouteDestination{
+								{
+									Destination: &v1alpha3.Destination{
+										Host:   serviceName,
+										Subset: "shared",
+									},
+								},
+							},
+						},
+					}
+					return nil
+				} else {
+					return errors.NewNotFound(schema.GroupResource{}, "test did not request correct name")
+				}
+			}
+			version := "unique-version"
+			prefix := helpers.CalculateVirtualServicePrefix(version, "subset")
+			handler := mkVirtualServiceHandler("unique", "ns", version, prefix, mc)
+			handler.ServiceHosts = []string{"my-service-host"}
+			handler.UniqueVersion = "unique-version"
+			vss := []types.NamespacedName{
+				{Name: "service", Namespace: "ns"},
+			}
+			handler.virtualServices = make(map[string][]types.NamespacedName)
+			handler.virtualServices["my-service-host"] = vss
+			expected := []riskifiedv1alpha1.ResourceStatus{
+				{
+					Name:      "service",
+					Namespace: "ns",
+					Status:    riskifiedv1alpha1.IgnoredMissingVS,
+				},
+			}
+			result, err := handler.GetStatus()
+			Expect(err).To(BeNil())
+			Expect(result).To(Equal(expected))
+		})
+
+		It("returns 'running' for every service that contains our routing", func() {
+			serviceName := "my-service-host"
+			uniqueVersion := "unique-version"
+			prefix := helpers.CalculateVirtualServicePrefix(uniqueVersion, "subset")
+			mc := struct{ MockClient }{}
+			mc.getMethod = func(_ context.Context, nn types.NamespacedName, o client.Object, _ ...client.GetOption) error {
+				if nn.Name == "service" && nn.Namespace == "ns" {
+					t := o.(*istionetwork.VirtualService)
+					t.Name = "service"
+					t.Namespace = "ns"
+					t.Spec.Hosts = []string{serviceName}
+					t.Spec.Http = []*v1alpha3.HTTPRoute{
+						{
+							Name: prefix + "abscdsdlkfj",
+							Route: []*v1alpha3.HTTPRouteDestination{
+								{
+									Destination: &v1alpha3.Destination{
+										Host:   serviceName,
+										Subset: "shared",
+									},
+								},
+							},
+						},
+					}
+					return nil
+				} else {
+					return errors.NewNotFound(schema.GroupResource{}, "test did not request correct name")
+				}
+			}
+			handler := mkVirtualServiceHandler("unique", "ns", uniqueVersion, prefix, mc)
+			handler.ServiceHosts = []string{"my-service-host"}
+			handler.UniqueVersion = uniqueVersion
+			vss := []types.NamespacedName{
+				{Name: "service", Namespace: "ns"},
+			}
+			handler.virtualServices = make(map[string][]types.NamespacedName)
+			handler.virtualServices["my-service-host"] = vss
+			expected := []riskifiedv1alpha1.ResourceStatus{
+				{
+					Name:      "service",
+					Namespace: "ns",
+					Status:    riskifiedv1alpha1.Running,
+				},
+			}
+			result, err := handler.GetStatus()
+			Expect(err).To(BeNil())
+			Expect(result).To(Equal(expected))
+		})
+	})
 })

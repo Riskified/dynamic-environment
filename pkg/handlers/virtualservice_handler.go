@@ -49,16 +49,19 @@ type VirtualServiceHandler struct {
 	Log            logr.Logger
 	Ctx            context.Context
 
-	activeHosts []string
+	activeHosts     []string
+	virtualServices map[string][]types.NamespacedName
 }
 
 // Fetches related Virtual Services and manipulates them accordingly.
 func (h *VirtualServiceHandler) Handle() error {
+	h.virtualServices = make(map[string][]types.NamespacedName)
 	for _, serviceHost := range h.ServiceHosts {
 		services, err := h.locateVirtualServicesByServiceHost(serviceHost)
 		if err != nil {
 			return err
 		}
+		h.virtualServices[serviceHost] = toNamespacedName(services)
 		var atLeastOneVSPerHostnameExists = false
 		for _, service := range services {
 			if err := h.updateVirtualService(serviceHost, service); err != nil {
@@ -82,12 +85,17 @@ func (h *VirtualServiceHandler) GetStatus() ([]riskifiedv1alpha1.ResourceStatus,
 	var services []*istionetwork.VirtualService
 	var statuses []riskifiedv1alpha1.ResourceStatus
 	for _, serviceHost := range h.ServiceHosts {
-		result, err := h.locateVirtualServicesByServiceHost(serviceHost)
-		if err != nil {
-			h.Log.Error(err, "While running GetStatus in VirtualServiceHandler")
-			return []riskifiedv1alpha1.ResourceStatus{}, err
+		s, ok := h.virtualServices[serviceHost]
+		if ok {
+			for _, nn := range s {
+				found := &istionetwork.VirtualService{}
+				if err := h.Get(h.Ctx, nn, found); err != nil {
+					h.Log.Error(err, "Fetching virtual service for status", "name", nn)
+					return nil, fmt.Errorf("fetching virtual service for status: %w", err)
+				}
+				services = append(services, found)
+			}
 		}
-		services = append(services, result...)
 	}
 	for _, service := range services {
 		s := h.getStatusForService(service)
@@ -346,4 +354,12 @@ func safeApplyResponseHeaders(headers *istioapi.Headers, key, value string) {
 	}
 	currentResponseSet[key] = value
 	headers.Response.Add = currentResponseSet
+}
+
+func toNamespacedName(services []*istionetwork.VirtualService) []types.NamespacedName {
+	var nns []types.NamespacedName
+	for _, s := range services {
+		nns = append(nns, types.NamespacedName{Name: s.Name, Namespace: s.Namespace})
+	}
+	return nns
 }
