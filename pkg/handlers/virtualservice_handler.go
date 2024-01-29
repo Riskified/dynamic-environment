@@ -186,6 +186,9 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.De
 			h.Log.V(0).Info(msg)
 			if err = h.StatusHandler.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
 				h.Log.Error(err, "Error writing virtual service status regarding delegate", "delegate", delegate)
+				if !errors.IsConflict(err) {
+					return nil, fmt.Errorf("failed to write global virtual service error: %w", err)
+				}
 			}
 			return nil, nil
 		} else {
