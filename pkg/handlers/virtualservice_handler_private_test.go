@@ -246,17 +246,6 @@ var _ = Describe("VirtualServiceHandler", func() {
 			}
 		}
 
-		It("returns empty result if no virtual service found", func() {
-			// TODO: How do we behave here? It should probably return error...
-			Skip("We need to think this over")
-			mc := struct{ MockClient }{}
-			handler := mkVirtualServiceHandler("unique", "ns", "_version", "_prefix", mc)
-			var expected []riskifiedv1alpha1.ResourceStatus
-			result, err := handler.GetStatus()
-			Expect(err).To(BeNil())
-			Expect(result).To(Equal(expected))
-		})
-
 		It("returns 'ignored-missing-virtual-service' for virtual services that does not contain our routes", func() {
 			serviceName := "my-service-host"
 			mc := struct{ MockClient }{}
