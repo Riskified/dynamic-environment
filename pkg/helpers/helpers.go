@@ -19,6 +19,7 @@ package helpers
 import (
 	"crypto/sha256"
 	"fmt"
+	"k8s.io/utils/strings/slices"
 	"strings"
 
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
@@ -41,15 +42,6 @@ func IsStringSliceEqual(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-func StringSliceContains(s string, strings []string) bool {
-	for _, item := range strings {
-		if item == s {
-			return true
-		}
-	}
-	return false
 }
 
 func RemoveItemFromStringSlice(s string, slc []string) []string {
@@ -123,7 +115,7 @@ func HeadersContainsExactStringMatch(headers map[string]riskifiedv1alpha1.String
 // Validate intersection between two slices is not empty/
 func CommonValueExists(l1, l2 []string) bool {
 	for _, s := range l2 {
-		if StringSliceContains(s, l1) {
+		if slices.Contains(l1, s) {
 			return true
 		}
 	}

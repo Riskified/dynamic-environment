@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"k8s.io/utils/strings/slices"
 
 	"github.com/go-logr/logr"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
@@ -53,7 +54,7 @@ type DestinationRuleHandler struct {
 	// The host name of the service that points to the Deployment specified in
 	// the subset.
 	ServiceHosts []string
-	// The name/nmespace of the DynamicEnv that launches this DestinationRule
+	// The name/namespace of the DynamicEnv that launches this DestinationRule
 	Owner types.NamespacedName
 	Log   logr.Logger
 	Ctx   context.Context
@@ -70,7 +71,7 @@ func (h *DestinationRuleHandler) Handle() error {
 		if err := h.Get(h.Ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
 			if errors.IsNotFound(err) {
 				if err := h.createMissingDestinationRule(drName, serviceHost); err != nil {
-					return err
+					return fmt.Errorf("creating destination rule for '%s': %w", serviceHost, err)
 				}
 				continue
 			}
@@ -104,7 +105,7 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 		drName := h.calculateDRName(sh)
 		if err := h.Get(h.Ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
 			if errors.IsNotFound(err) {
-				if helpers.StringSliceContains(sh, h.ignoredMissing) {
+				if slices.Contains(h.ignoredMissing, sh) {
 					statuses = append(statuses, genStatus(drName, riskifiedv1alpha1.IgnoredMissingDR))
 					continue
 				}
@@ -140,29 +141,22 @@ func (h *DestinationRuleHandler) createMissingDestinationRule(destinationRuleNam
 	if err := h.setStatus(h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
 		return fmt.Errorf("failed to update status (prior to launching destination rule: %s): %w", serviceHost, err)
 	}
-	if err := h.createOverridingDestinationRule(destinationRuleName, serviceHost); err != nil {
+	newDestinationRule, err := h.generateOverridingDestinationRule(serviceHost)
+	if err != nil {
 		if goerrors.As(err, &IgnoredMissing{}) {
 			h.ignoredMissing = append(h.ignoredMissing, serviceHost)
 			h.Log.Info("Added hostname to list of ignored missing", "hostname", serviceHost)
+			return nil
 		} else {
 			return fmt.Errorf("creating destination rule for '%s': %w", serviceHost, err)
 		}
-	} else {
-		h.activeHosts = append(h.activeHosts, serviceHost)
 	}
-	return nil
-}
-
-func (h *DestinationRuleHandler) createOverridingDestinationRule(drName, serviceHost string) error {
-	newDestinationRule, err := h.generateOverridingDestinationRule(serviceHost)
-	if err != nil {
-		return fmt.Errorf("creating overriding destination rule: %w", err)
-	}
-	h.Log.Info("Deploying newly created destination rule", "destination rule name", h.UniqueName, "service-host", drName)
+	h.Log.Info("Deploying newly created destination rule", "destination rule name", h.UniqueName, "service-host", destinationRuleName)
 	watches.AddToAnnotation(h.Owner, newDestinationRule)
 	if err = h.Create(h.Ctx, newDestinationRule); err != nil {
-		return fmt.Errorf("error deploying new destination rule version=%q service-host=%q: %w", h.UniqueName, drName, err)
+		return fmt.Errorf("error deploying new destination rule version=%q service-host=%q: %w", h.UniqueName, destinationRuleName, err)
 	}
+	h.activeHosts = append(h.activeHosts, serviceHost)
 	return nil
 }
 

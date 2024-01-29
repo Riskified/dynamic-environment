@@ -18,6 +18,7 @@ package watches
 
 import (
 	"fmt"
+	"k8s.io/utils/strings/slices"
 	"strings"
 
 	"github.com/riskified/dynamic-environment/pkg/helpers"
@@ -89,7 +90,7 @@ func AddToAnnotation(owner types.NamespacedName, object client.Object) {
 
 	if len(existingDynamicEnvs) == 1 && existingDynamicEnvs[0] == "" {
 		existingDynamicEnvs[0] = currentDynamicEnv
-	} else if !helpers.StringSliceContains(currentDynamicEnv, existingDynamicEnvs) {
+	} else if !slices.Contains(existingDynamicEnvs, currentDynamicEnv) {
 		existingDynamicEnvs = append(existingDynamicEnvs, currentDynamicEnv)
 	}
 
@@ -121,5 +122,5 @@ func ContainsAnnotation(searchItem types.NamespacedName, object client.Object) b
 	}
 	existingAnnotations := strings.Split(annotations[NamespacedNameAnnotation], ",")
 	searchFor := fmt.Sprintf("%s/%s", searchItem.Namespace, searchItem.Name)
-	return helpers.StringSliceContains(searchFor, existingAnnotations)
+	return slices.Contains(existingAnnotations, searchFor)
 }
