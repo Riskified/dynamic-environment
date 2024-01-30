@@ -336,6 +336,11 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.V(1).Info("Requeue because of non running status")
 		return ctrl.Result{Requeue: true}, nil
 	}
+	if errors.IsConflict(rls.returnError) {
+		log.Info("Skipping conflict error")
+		// TODO: Do we really need to requeue? Because of the conflict it should run again anyway...
+		return ctrl.Result{Requeue: true}, nil
+	}
 	return ctrl.Result{}, rls.returnError
 }
 
