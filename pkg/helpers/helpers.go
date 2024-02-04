@@ -121,3 +121,8 @@ func CommonValueExists(l1, l2 []string) bool {
 	}
 	return false
 }
+
+// Just a convention to name subsets
+func MKSubsetName(subset riskifiedv1alpha1.Subset) string {
+	return fmt.Sprintf("%s/%s", subset.Namespace, subset.Name)
+}

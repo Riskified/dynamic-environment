@@ -29,6 +29,11 @@ type LifeCycleStatus string
 type GlobalReadyStatus string
 type SubsetOrConsumer int
 
+type SubsetType struct {
+	Type   SubsetOrConsumer
+	Subset Subset
+}
+
 const (
 	// Various life cycle statuses
 	Unknown          LifeCycleStatus = "unknown" // The default status
