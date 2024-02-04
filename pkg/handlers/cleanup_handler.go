@@ -29,6 +29,7 @@ type CleanupHandler struct {
 
 type SubsetsAndConsumersMap = map[string]riskifiedv1alpha1.SubsetOrConsumer
 
+// Checks for subsets and consumers that should be removed because of spec update.
 func (ch *CleanupHandler) CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers []riskifiedv1alpha1.SubsetType) SubsetsAndConsumersMap {
 	var allSubsetsAndConsumers = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for _, st := range subsetsAndConsumers {
@@ -56,23 +57,24 @@ func (ch *CleanupHandler) CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers
 	return removed
 }
 
-// Checks whether subsets/consumers were removed i
+// Removes the provided subsets and consumers. Returns whether there are deletions in progress and an error if occurred.
+// You can use the output of CheckForRemovedSubsetsAndConsumers as an input.
 func (ch *CleanupHandler) RemoveSubsetsAndConsumers(subsetsAndConsumers SubsetsAndConsumersMap) (inProgress bool, _ error) {
 	for name, typ := range subsetsAndConsumers {
 		if typ == riskifiedv1alpha1.CONSUMER {
-			processing, err := ch.cleanupConsumer(name)
+			processing, err := ch.removeConsumer(name)
 			if err != nil {
-				ch.Log.Error(err, "cleanup removed consumer")
-				return processing, fmt.Errorf("cleanup removed consumer: %w", err)
+				ch.Log.Error(err, "delete removed consumer")
+				return processing, fmt.Errorf("delete removed consumer: %w", err)
 			}
 			if processing {
 				inProgress = true
 			}
 		} else {
-			processing, err := ch.cleanupSubset(name)
+			processing, err := ch.removeSubset(name)
 			if err != nil {
-				ch.Log.Error(err, "cleanup removed subset")
-				return processing, fmt.Errorf("cleanup removed subset: %w", err)
+				ch.Log.Error(err, "delete removed subset")
+				return processing, fmt.Errorf("delete removed subset: %w", err)
 			}
 			if processing {
 				inProgress = true
@@ -89,11 +91,12 @@ func (ch *CleanupHandler) DeleteAllResources() (ctrl.Result, error) {
 	if slices.Contains(ch.DE.Finalizers, names.DeleteDeployments) {
 		count, err := ch.deleteAllDeployments()
 		if err != nil {
-			ch.Log.Error(err, "error removing cleanupDeployments finalizer")
+			ch.Log.Error(err, "cleanup all resources")
 			return ctrl.Result{}, err
 		}
 		if count == 0 {
 			if err := ch.deleteFinalizer(names.DeleteDeployments); err != nil {
+				ch.Log.Error(err, "removing DeleteDeployments finalizer")
 				return ctrl.Result{}, err
 			}
 		}
@@ -101,21 +104,23 @@ func (ch *CleanupHandler) DeleteAllResources() (ctrl.Result, error) {
 	if slices.Contains(ch.DE.Finalizers, names.DeleteDestinationRules) {
 		count, err := ch.deleteAllDestinationRules()
 		if err != nil {
-			ch.Log.Error(err, "error removing DeleteDestinationRules finalizer")
+			ch.Log.Error(err, "cleanup all resources")
 			return ctrl.Result{}, err
 		}
 		if count == 0 {
 			if err := ch.deleteFinalizer(names.DeleteDestinationRules); err != nil {
+				ch.Log.Error(err, "removing DeleteDestinationRules finalizer")
 				return ctrl.Result{}, err
 			}
 		}
 	}
 	if slices.Contains(ch.DE.Finalizers, names.CleanupVirtualServices) {
 		if err := ch.cleanupVirtualServices(); err != nil {
-			ch.Log.Error(err, "error removing CleanupVirtualServices finalizer")
+			ch.Log.Error(err, "cleanup all resources")
 			return ctrl.Result{}, err
 		}
 		if err := ch.deleteFinalizer(names.CleanupVirtualServices); err != nil {
+			ch.Log.Error(err, "error removing CleanupVirtualServices finalizer")
 			return ctrl.Result{}, err
 		}
 	}
@@ -157,7 +162,7 @@ func (ch *CleanupHandler) deleteAllDeployments() (int, error) {
 }
 
 // Deletes all the destination-rules created by the controller.
-// Returns the number of running DRs and error.
+// Returns the number of deletions in progress and error.
 func (ch *CleanupHandler) deleteAllDestinationRules() (int, error) {
 	var drs []riskifiedv1alpha1.ResourceStatus
 	var runningCount int
@@ -165,7 +170,7 @@ func (ch *CleanupHandler) deleteAllDestinationRules() (int, error) {
 		drs = append(drs, s.DestinationRules...)
 	}
 	for _, item := range drs {
-		ch.Log.Info("Cleaning up destination rule ...", "destinationRule", item)
+		ch.Log.Info("Deleting destination rule ...", "destinationRule", item)
 		found, err := ch.deleteDestinationRule(item)
 		if err != nil {
 			return runningCount, fmt.Errorf("deleting destination rule: %w", err)
@@ -177,7 +182,7 @@ func (ch *CleanupHandler) deleteAllDestinationRules() (int, error) {
 	return runningCount, nil
 }
 
-// Deletes all affected virtual services.
+// Deletes all modified virtual services.
 func (ch *CleanupHandler) cleanupVirtualServices() error {
 	var vss []riskifiedv1alpha1.ResourceStatus
 	for _, s := range ch.DE.Status.SubsetsStatus {
@@ -221,12 +226,12 @@ func (ch *CleanupHandler) cleanupVirtualService(vs riskifiedv1alpha1.ResourceSta
 	return nil
 }
 
-func (ch *CleanupHandler) cleanupConsumer(name string) (processing bool, err error) {
+func (ch *CleanupHandler) removeConsumer(name string) (processing bool, err error) {
 	st, ok := ch.DE.Status.ConsumersStatus[name]
 	if ok {
 		found, err := ch.deleteDeployment(st.ResourceStatus)
 		if err != nil {
-			return true, fmt.Errorf("deleting removed consumer: %w", err)
+			return true, fmt.Errorf("remove consumer: %w", err)
 		}
 		if found {
 			status := ch.DE.Status.ConsumersStatus[name]
@@ -238,32 +243,17 @@ func (ch *CleanupHandler) cleanupConsumer(name string) (processing bool, err err
 			return false, ch.Status().Update(ch.Ctx, ch.DE)
 		}
 	}
-	ch.Log.V(1).Info("Consumer cleanup finished", "consumer", name)
+	ch.Log.V(1).Info("Consumer removal finished", "consumer", name)
 	return false, nil
 }
 
-func (ch *CleanupHandler) deleteDeployment(deployment riskifiedv1alpha1.ResourceStatus) (found bool, _ error) {
-
-	dep := appsv1.Deployment{}
-	if err := ch.Get(ch.Ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, &dep); err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("fetching deployment for deletion: %w", err)
-	}
-	if err := ch.Delete(ch.Ctx, &dep); err != nil {
-		return true, fmt.Errorf("deleting deployment: %w", err)
-	}
-	return true, nil
-}
-
-func (ch *CleanupHandler) cleanupSubset(name string) (processing bool, _ error) {
+func (ch *CleanupHandler) removeSubset(name string) (processing bool, _ error) {
 	st, ok := ch.DE.Status.SubsetsStatus[name]
 	exists := false
 	if ok {
 		found, err := ch.deleteDeployment(st.Deployment)
 		if err != nil {
-			return true, fmt.Errorf("deleting deployment from removed subset: %w", err)
+			return true, fmt.Errorf("removing subset: %w", err)
 		}
 		if found {
 			exists = found
@@ -271,7 +261,7 @@ func (ch *CleanupHandler) cleanupSubset(name string) (processing bool, _ error) 
 		for _, dr := range st.DestinationRules {
 			found, err := ch.deleteDestinationRule(dr)
 			if err != nil {
-				return true, fmt.Errorf("deleting destination rule from removed subset: %w", err)
+				return true, fmt.Errorf("removing subset: %w", err)
 			}
 			if found {
 				exists = found
@@ -279,7 +269,7 @@ func (ch *CleanupHandler) cleanupSubset(name string) (processing bool, _ error) 
 		}
 		for _, vs := range st.VirtualServices {
 			if err := ch.cleanupVirtualService(vs); err != nil {
-				return true, fmt.Errorf("cleaning virtual servive from removed subset routes: %w", err)
+				return true, fmt.Errorf("removing subset: %w", err)
 			}
 		}
 	}
@@ -292,6 +282,20 @@ func (ch *CleanupHandler) cleanupSubset(name string) (processing bool, _ error) 
 		delete(ch.DE.Status.SubsetsStatus, name)
 		return false, ch.Status().Update(ch.Ctx, ch.DE)
 	}
+}
+
+func (ch *CleanupHandler) deleteDeployment(deployment riskifiedv1alpha1.ResourceStatus) (found bool, _ error) {
+	dep := appsv1.Deployment{}
+	if err := ch.Get(ch.Ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, &dep); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("fetching deployment for deletion: %w", err)
+	}
+	if err := ch.Delete(ch.Ctx, &dep); err != nil {
+		return true, fmt.Errorf("deleting deployment: %w", err)
+	}
+	return true, nil
 }
 
 func (ch *CleanupHandler) deleteDestinationRule(dr riskifiedv1alpha1.ResourceStatus) (found bool, _ error) {
