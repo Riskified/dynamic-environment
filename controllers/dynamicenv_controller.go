@@ -22,6 +22,7 @@ import (
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/handlers"
 	"github.com/riskified/dynamic-environment/pkg/helpers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"github.com/riskified/dynamic-environment/pkg/watches"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -174,8 +175,16 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			break
 		}
 
+		subsetData := model.DynamicEnvReconcileData{
+			Identifier:     types.NamespacedName{Namespace: dynamicEnv.Namespace, Name: dynamicEnv.Name},
+			BaseDeployment: baseDeployment,
+			Subset:         s,
+			StatusHandler:  &statusHandler,
+			Matches:        dynamicEnv.Spec.IstioMatches,
+		}
+
 		if st.Type == riskifiedv1alpha1.CONSUMER {
-			handler, err := r.processConsumer(ctx, s, dynamicEnv, &statusHandler, baseDeployment, resourceName)
+			handler, err := r.processConsumer(ctx, subsetData, dynamicEnv)
 			deploymentHandlers = append(deploymentHandlers, handler)
 			if err != nil {
 				rls.returnError = err
@@ -184,7 +193,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		if st.Type == riskifiedv1alpha1.SUBSET {
-			response, err := r.processSubset(ctx, s, dynamicEnv, &statusHandler, baseDeployment, resourceName, defaultVersionForSubset)
+			response, err := r.processSubset(ctx, subsetData, defaultVersionForSubset, dynamicEnv)
 			deploymentHandlers = append(deploymentHandlers, response.deploymentHandler)
 			mrHandlers = append(mrHandlers, response.mrHandlers...)
 			rls.subsetMessages[subsetName] = response.msgs
@@ -263,6 +272,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	statusHandler.SyncSubsetMessagesToStatus(rls.subsetMessages)
 	statusHandler.SyncConsumerMessagesToStatus(rls.consumerMessages)
 	if err := statusHandler.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
+		// TODO: do we need this manual checking now that we're handling conflicts globally?
 		if errors.IsConflict(err) {
 			log.Info("Ignoring global status update error due to conflict")
 		} else {
@@ -286,28 +296,24 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 func (r *DynamicEnvReconciler) processConsumer(
 	ctx context.Context,
-	s riskifiedv1alpha1.Subset,
-	de *riskifiedv1alpha1.DynamicEnv,
-	sh *handlers.DynamicEnvStatusHandler,
-	baseDeployment *appsv1.Deployment,
-	resourceName string,
+	subsetData model.DynamicEnvReconcileData,
+	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove
 ) (handlers.SRHandler, error) {
 	uniqueVersion := helpers.UniqueDynamicEnvName(de)
-	subsetName := helpers.MKSubsetName(s)
 	deploymentHandler := handlers.DeploymentHandler{
 		Client:         r.Client,
-		UniqueName:     mkSubsetUniqueName(s.Name, uniqueVersion),
+		UniqueName:     mkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion),
 		UniqueVersion:  uniqueVersion,
-		SubsetName:     subsetName,
-		Owner:          types.NamespacedName{Namespace: de.Namespace, Name: de.Name},
-		BaseDeployment: baseDeployment,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		Owner:          subsetData.Identifier,
+		BaseDeployment: subsetData.BaseDeployment,
 		DeploymentType: riskifiedv1alpha1.CONSUMER,
 		LabelsToRemove: r.LabelsToRemove,
 		VersionLabel:   r.VersionLabel,
-		StatusHandler:  sh,
-		Matches:        de.Spec.IstioMatches,
-		Subset:         s,
-		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
+		StatusHandler:  subsetData.StatusHandler,
+		Matches:        subsetData.Matches,
+		Subset:         subsetData.Subset,
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", mkResourceName(subsetData.Identifier)),
 		Ctx:            ctx,
 	}
 	if err := deploymentHandler.Handle(); err != nil {
@@ -318,12 +324,12 @@ func (r *DynamicEnvReconciler) processConsumer(
 
 func (r *DynamicEnvReconciler) processSubset(
 	ctx context.Context,
-	s riskifiedv1alpha1.Subset,
-	de *riskifiedv1alpha1.DynamicEnv,
-	sh *handlers.DynamicEnvStatusHandler,
-	baseDeployment *appsv1.Deployment,
-	resourceName, defaultVersionForSubset string,
+	subsetData model.DynamicEnvReconcileData,
+	defaultVersionForSubset string,
+	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove parameter
 ) (response processSubsetResponse, _ error) {
+	s := subsetData.Subset
+	resourceName := mkResourceName(subsetData.Identifier)
 	uniqueVersion := helpers.UniqueDynamicEnvName(de)
 	uniqueName := mkSubsetUniqueName(s.Name, uniqueVersion)
 	subsetName := helpers.MKSubsetName(s)
@@ -334,11 +340,11 @@ func (r *DynamicEnvReconciler) processSubset(
 		UniqueVersion:  uniqueVersion,
 		SubsetName:     subsetName,
 		Owner:          owner,
-		BaseDeployment: baseDeployment,
+		BaseDeployment: subsetData.BaseDeployment,
 		DeploymentType: riskifiedv1alpha1.SUBSET,
 		LabelsToRemove: r.LabelsToRemove,
 		VersionLabel:   r.VersionLabel,
-		StatusHandler:  sh,
+		StatusHandler:  subsetData.StatusHandler,
 		Matches:        de.Spec.IstioMatches,
 		Subset:         s,
 		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
@@ -350,9 +356,9 @@ func (r *DynamicEnvReconciler) processSubset(
 		return response, err
 	}
 
-	serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, baseDeployment.Spec.Template.ObjectMeta.Labels)
+	serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, subsetData.BaseDeployment.Spec.Template.ObjectMeta.Labels)
 	if err != nil {
-		msg := fmt.Sprintf("locating service hostname for deployment '%s'", baseDeployment.Name)
+		msg := fmt.Sprintf("locating service hostname for deployment '%s'", subsetData.BaseDeployment.Name)
 		response.msgs = response.msgs.AppendGlobalMsg("%s: %v", msg, err)
 		return response, fmt.Errorf("%s: %w", msg, err)
 	}
@@ -365,7 +371,7 @@ func (r *DynamicEnvReconciler) processSubset(
 		SubsetName:     subsetName,
 		VersionLabel:   r.VersionLabel,
 		DefaultVersion: defaultVersionForSubset,
-		StatusHandler:  sh,
+		StatusHandler:  subsetData.StatusHandler,
 		ServiceHosts:   serviceHosts,
 		Owner:          owner,
 		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
@@ -387,7 +393,7 @@ func (r *DynamicEnvReconciler) processSubset(
 		ServiceHosts:   serviceHosts,
 		DefaultVersion: defaultVersionForSubset,
 		DynamicEnv:     de,
-		StatusHandler:  sh,
+		StatusHandler:  subsetData.StatusHandler,
 		Log:            helpers.MkLogger("VirtualServiceHandler", "resource", resourceName),
 		Ctx:            ctx,
 	}
@@ -503,4 +509,8 @@ func markedForDeletion(de *riskifiedv1alpha1.DynamicEnv) bool {
 
 func mkSubsetUniqueName(name, version string) string {
 	return name + "-" + version
+}
+
+func mkResourceName(id types.NamespacedName) string {
+	return fmt.Sprintf("%s/%s", id.Namespace, id.Name)
 }
