@@ -59,6 +59,13 @@ type ReconcileLoopStatus struct {
 	nonReadyCS map[string]bool
 }
 
+type processSubsetResponse struct {
+	msgs              riskifiedv1alpha1.SubsetMessages
+	deploymentHandler handlers.SRHandler
+	mrHandlers        []handlers.MRHandler
+	noCommonHost      bool
+}
+
 func (rls *ReconcileLoopStatus) setErrorIfNotMasking(err error) {
 	if rls.returnError == nil {
 		rls.returnError = err
@@ -107,7 +114,6 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, fmt.Errorf("failed to fetch dynamic environment: %w", err)
 	}
 
-	uniqueVersion := helpers.UniqueDynamicEnvName(dynamicEnv)
 	resourceName := fmt.Sprintf("%s/%s", dynamicEnv.Namespace, dynamicEnv.Name)
 	log := log.WithValues("resource", resourceName)
 
@@ -127,7 +133,6 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	owner := types.NamespacedName{Name: dynamicEnv.Name, Namespace: dynamicEnv.Namespace}
 	var deploymentHandlers []handlers.SRHandler
 	var mrHandlers []handlers.MRHandler
 	nonReadyExists := false
@@ -152,7 +157,6 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	for _, st := range subsetsAndConsumers {
 		s := st.Subset
-		uniqueName := mkSubsetUniqueName(s.Name, uniqueVersion)
 		defaultVersionForSubset := r.DefaultVersion
 		if s.DefaultVersion != "" {
 			defaultVersionForSubset = s.DefaultVersion
@@ -170,91 +174,26 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			break
 		}
 
-		deploymentHandler := handlers.DeploymentHandler{
-			Client:         r.Client,
-			UniqueName:     uniqueName,
-			UniqueVersion:  uniqueVersion,
-			SubsetName:     subsetName,
-			Owner:          owner,
-			BaseDeployment: baseDeployment,
-			DeploymentType: st.Type,
-			LabelsToRemove: r.LabelsToRemove,
-			VersionLabel:   r.VersionLabel,
-			StatusHandler:  &statusHandler,
-			Matches:        dynamicEnv.Spec.IstioMatches,
-			Subset:         s,
-			Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
-			Ctx:            ctx,
-		}
-		deploymentHandlers = append(deploymentHandlers, &deploymentHandler)
-		if err := deploymentHandler.Handle(); err != nil {
-			rls.returnError = err
-			rls.addDeploymentMessage(subsetName, st.Type, err.Error())
-			break
+		if st.Type == riskifiedv1alpha1.CONSUMER {
+			handler, err := r.processConsumer(ctx, s, dynamicEnv, &statusHandler, baseDeployment, resourceName)
+			deploymentHandlers = append(deploymentHandlers, handler)
+			if err != nil {
+				rls.returnError = err
+				rls.addDeploymentMessage(subsetName, riskifiedv1alpha1.CONSUMER, err.Error())
+			}
 		}
 
 		if st.Type == riskifiedv1alpha1.SUBSET {
-			serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, baseDeployment.Spec.Template.ObjectMeta.Labels)
-			if err != nil {
-				msg := fmt.Sprintf("locating service hostname for deployment '%s'", baseDeployment.Name)
-				rls.returnError = fmt.Errorf("%s: %w", msg, err)
-				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendGlobalMsg("%s: %v", msg, err)
-				break
-			}
-
-			destinationRuleHandler := handlers.DestinationRuleHandler{
-				Client:         r.Client,
-				UniqueName:     uniqueName,
-				UniqueVersion:  uniqueVersion,
-				Namespace:      s.Namespace,
-				SubsetName:     subsetName,
-				VersionLabel:   r.VersionLabel,
-				DefaultVersion: defaultVersionForSubset,
-				StatusHandler:  &statusHandler,
-				ServiceHosts:   serviceHosts,
-				Owner:          owner,
-				Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
-				Ctx:            ctx,
-			}
-			mrHandlers = append(mrHandlers, &destinationRuleHandler)
-			if err := destinationRuleHandler.Handle(); err != nil {
-				rls.returnError = err
-				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendDestinationRuleMsg(err.Error())
-				break
-			}
-
-			virtualServiceHandler := handlers.VirtualServiceHandler{
-				Client:         r.Client,
-				UniqueName:     uniqueName,
-				UniqueVersion:  uniqueVersion,
-				RoutePrefix:    helpers.CalculateVirtualServicePrefix(uniqueVersion, s.Name),
-				Namespace:      s.Namespace,
-				SubsetName:     subsetName,
-				ServiceHosts:   serviceHosts,
-				DefaultVersion: defaultVersionForSubset,
-				DynamicEnv:     dynamicEnv,
-				StatusHandler:  &statusHandler,
-				Log:            helpers.MkLogger("VirtualServiceHandler", "resource", resourceName),
-				Ctx:            ctx,
-			}
-
-			mrHandlers = append(mrHandlers, &virtualServiceHandler)
-			if err := virtualServiceHandler.Handle(); err != nil {
-				if errors.IsConflict(err) {
-					log.V(1).Info("ignoring update error due to version conflict", "error", err)
-				} else {
-					log.Error(err, "error updating virtual service for subset", "subset", s.Name)
-					msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
-					rls.returnError = fmt.Errorf("%s: %w", msg, err)
-					rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendVirtualServiceMsg("%s: %s", msg, err)
-				}
-			}
-
-			commonHostExists := helpers.CommonValueExists(destinationRuleHandler.GetHosts(), virtualServiceHandler.GetHosts())
-			if !commonHostExists {
+			response, err := r.processSubset(ctx, s, dynamicEnv, &statusHandler, baseDeployment, resourceName, defaultVersionForSubset)
+			deploymentHandlers = append(deploymentHandlers, response.deploymentHandler)
+			mrHandlers = append(mrHandlers, response.mrHandlers...)
+			rls.subsetMessages[subsetName] = response.msgs
+			if response.noCommonHost {
 				degradedExists = true
 				rls.nonReadyCS[subsetName] = true
-				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendGlobalMsg("Couldn't find common active service hostname across DestinationRules and VirtualServices")
+			}
+			if err != nil {
+				rls.returnError = err
 			}
 		}
 	}
@@ -343,6 +282,137 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{Requeue: true}, nil
 	}
 	return ctrl.Result{}, rls.returnError
+}
+
+func (r *DynamicEnvReconciler) processConsumer(
+	ctx context.Context,
+	s riskifiedv1alpha1.Subset,
+	de *riskifiedv1alpha1.DynamicEnv,
+	sh *handlers.DynamicEnvStatusHandler,
+	baseDeployment *appsv1.Deployment,
+	resourceName string,
+) (handlers.SRHandler, error) {
+	uniqueVersion := helpers.UniqueDynamicEnvName(de)
+	subsetName := helpers.MKSubsetName(s)
+	deploymentHandler := handlers.DeploymentHandler{
+		Client:         r.Client,
+		UniqueName:     mkSubsetUniqueName(s.Name, uniqueVersion),
+		UniqueVersion:  uniqueVersion,
+		SubsetName:     subsetName,
+		Owner:          types.NamespacedName{Namespace: de.Namespace, Name: de.Name},
+		BaseDeployment: baseDeployment,
+		DeploymentType: riskifiedv1alpha1.CONSUMER,
+		LabelsToRemove: r.LabelsToRemove,
+		VersionLabel:   r.VersionLabel,
+		StatusHandler:  sh,
+		Matches:        de.Spec.IstioMatches,
+		Subset:         s,
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
+		Ctx:            ctx,
+	}
+	if err := deploymentHandler.Handle(); err != nil {
+		return &deploymentHandler, err
+	}
+	return &deploymentHandler, nil
+}
+
+func (r *DynamicEnvReconciler) processSubset(
+	ctx context.Context,
+	s riskifiedv1alpha1.Subset,
+	de *riskifiedv1alpha1.DynamicEnv,
+	sh *handlers.DynamicEnvStatusHandler,
+	baseDeployment *appsv1.Deployment,
+	resourceName, defaultVersionForSubset string,
+) (response processSubsetResponse, _ error) {
+	uniqueVersion := helpers.UniqueDynamicEnvName(de)
+	uniqueName := mkSubsetUniqueName(s.Name, uniqueVersion)
+	subsetName := helpers.MKSubsetName(s)
+	owner := types.NamespacedName{Namespace: de.Namespace, Name: de.Name}
+	deploymentHandler := handlers.DeploymentHandler{
+		Client:         r.Client,
+		UniqueName:     mkSubsetUniqueName(s.Name, uniqueVersion),
+		UniqueVersion:  uniqueVersion,
+		SubsetName:     subsetName,
+		Owner:          owner,
+		BaseDeployment: baseDeployment,
+		DeploymentType: riskifiedv1alpha1.SUBSET,
+		LabelsToRemove: r.LabelsToRemove,
+		VersionLabel:   r.VersionLabel,
+		StatusHandler:  sh,
+		Matches:        de.Spec.IstioMatches,
+		Subset:         s,
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
+		Ctx:            ctx,
+	}
+	response.deploymentHandler = &deploymentHandler
+	if err := deploymentHandler.Handle(); err != nil {
+		response.msgs = response.msgs.AppendDeploymentMsg(err.Error())
+		return response, err
+	}
+
+	serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, baseDeployment.Spec.Template.ObjectMeta.Labels)
+	if err != nil {
+		msg := fmt.Sprintf("locating service hostname for deployment '%s'", baseDeployment.Name)
+		response.msgs = response.msgs.AppendGlobalMsg("%s: %v", msg, err)
+		return response, fmt.Errorf("%s: %w", msg, err)
+	}
+
+	destinationRuleHandler := handlers.DestinationRuleHandler{
+		Client:         r.Client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		Namespace:      s.Namespace,
+		SubsetName:     subsetName,
+		VersionLabel:   r.VersionLabel,
+		DefaultVersion: defaultVersionForSubset,
+		StatusHandler:  sh,
+		ServiceHosts:   serviceHosts,
+		Owner:          owner,
+		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
+		Ctx:            ctx,
+	}
+	response.mrHandlers = append(response.mrHandlers, &destinationRuleHandler)
+	if err := destinationRuleHandler.Handle(); err != nil {
+		response.msgs = response.msgs.AppendDestinationRuleMsg(err.Error())
+		return response, err
+	}
+
+	virtualServiceHandler := handlers.VirtualServiceHandler{
+		Client:         r.Client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		RoutePrefix:    helpers.CalculateVirtualServicePrefix(uniqueVersion, s.Name),
+		Namespace:      s.Namespace,
+		SubsetName:     subsetName,
+		ServiceHosts:   serviceHosts,
+		DefaultVersion: defaultVersionForSubset,
+		DynamicEnv:     de,
+		StatusHandler:  sh,
+		Log:            helpers.MkLogger("VirtualServiceHandler", "resource", resourceName),
+		Ctx:            ctx,
+	}
+
+	var returnError error // so we'll be able to test for commonHost even if an error occurred.
+	response.mrHandlers = append(response.mrHandlers, &virtualServiceHandler)
+	if err := virtualServiceHandler.Handle(); err != nil {
+		if errors.IsConflict(err) {
+			// TODO: Check the option for removal of this spacial clause. We already handle conflicts in the end of the reconcile loop.
+			log.V(1).Info("ignoring update error due to version conflict", "error", err)
+		} else {
+			log.Error(err, "error updating virtual service for subset", "subset", s.Name)
+			msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
+			response.msgs = response.msgs.AppendVirtualServiceMsg("%s: %s", msg, err)
+			returnError = fmt.Errorf("%s: %w", msg, err)
+		}
+	}
+
+	commonHostExists := helpers.CommonValueExists(destinationRuleHandler.GetHosts(), virtualServiceHandler.GetHosts())
+	if !commonHostExists {
+		response.msgs = response.msgs.AppendGlobalMsg("Couldn't find common active service hostname across DestinationRules and VirtualServices")
+		response.noCommonHost = true
+	}
+
+	return response, returnError
 }
 
 func (r *DynamicEnvReconciler) locateMatchingServiceHostnames(ctx context.Context, namespace string, ls labels.Set) (serviceHosts []string, err error) {
