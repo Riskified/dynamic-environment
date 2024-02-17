@@ -64,6 +64,32 @@ type DestinationRuleHandler struct {
 	activeHosts    []string
 }
 
+func NewDestinationRuleHandler(
+	subsetData model.DynamicEnvReconcileData,
+	versionLabel,
+	defaultVersion string,
+	serviceHosts []string,
+	client client.Client,
+	ctx context.Context,
+) *DestinationRuleHandler {
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
+	return &DestinationRuleHandler{
+		Client:         client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		Namespace:      subsetData.Subset.Namespace,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		VersionLabel:   versionLabel,
+		DefaultVersion: defaultVersion,
+		StatusManager:  subsetData.StatusManager,
+		ServiceHosts:   serviceHosts,
+		Owner:          subsetData.Identifier,
+		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
+		Ctx:            ctx,
+	}
+}
+
 // Handles creation and manipulation of related DestinationRules.
 func (h *DestinationRuleHandler) Handle() error {
 	for _, serviceHost := range h.ServiceHosts {

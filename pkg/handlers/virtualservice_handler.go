@@ -55,6 +55,7 @@ type VirtualServiceHandler struct {
 	virtualServices map[string][]types.NamespacedName
 }
 
+// Initializes VirtualServiceHandler with provided and default values
 func NewVirtualServiceHandler(
 	subsetData model.DynamicEnvReconcileData,
 	serviceHosts []string,

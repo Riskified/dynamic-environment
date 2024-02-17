@@ -68,6 +68,36 @@ type DeploymentHandler struct {
 	Ctx    context.Context
 }
 
+// Initializes DeploymentHandler with provided and default values
+func NewDeploymentHandler(
+	subsetData model.DynamicEnvReconcileData,
+	client client.Client,
+	dt riskifiedv1alpha1.SubsetOrConsumer,
+	labelsToRemove []string,
+	versionLabel string,
+	ctx context.Context, // TODO: remove this
+) *DeploymentHandler {
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
+	return &DeploymentHandler{
+		Client:         client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		Owner:          subsetData.Identifier,
+		BaseDeployment: subsetData.BaseDeployment,
+		DeploymentType: dt,
+		LabelsToRemove: labelsToRemove,
+		VersionLabel:   versionLabel,
+		StatusManager:  subsetData.StatusManager,
+		Matches:        subsetData.Matches,
+		Updating:       false,
+		Subset:         subsetData.Subset,
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
+		Ctx:            ctx,
+	}
+}
+
 // Handles creation and manipulation of related Deployments.
 func (h *DeploymentHandler) Handle() error {
 	subset := h.Subset

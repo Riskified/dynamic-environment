@@ -184,7 +184,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		if st.Type == riskifiedv1alpha1.CONSUMER {
-			handler, err := r.processConsumer(ctx, subsetData, dynamicEnv)
+			handler, err := r.processConsumer(ctx, subsetData)
 			deploymentHandlers = append(deploymentHandlers, handler)
 			if err != nil {
 				rls.returnError = err
@@ -297,29 +297,12 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *DynamicEnvReconciler) processConsumer(
 	ctx context.Context,
 	subsetData model.DynamicEnvReconcileData,
-	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove
 ) (handlers.SRHandler, error) {
-	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
-	deploymentHandler := handlers.DeploymentHandler{
-		Client:         r.Client,
-		UniqueName:     helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion),
-		UniqueVersion:  uniqueVersion,
-		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
-		Owner:          subsetData.Identifier,
-		BaseDeployment: subsetData.BaseDeployment,
-		DeploymentType: riskifiedv1alpha1.CONSUMER,
-		LabelsToRemove: r.LabelsToRemove,
-		VersionLabel:   r.VersionLabel,
-		StatusManager:  subsetData.StatusManager,
-		Matches:        subsetData.Matches,
-		Subset:         subsetData.Subset,
-		Log:            helpers.MkLogger("DeploymentHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
-		Ctx:            ctx,
-	}
+	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.CONSUMER, r.LabelsToRemove, r.VersionLabel, ctx)
 	if err := deploymentHandler.Handle(); err != nil {
-		return &deploymentHandler, err
+		return deploymentHandler, err
 	}
-	return &deploymentHandler, nil
+	return deploymentHandler, nil
 }
 
 func (r *DynamicEnvReconciler) processSubset(
@@ -329,28 +312,10 @@ func (r *DynamicEnvReconciler) processSubset(
 	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove parameter
 ) (response processSubsetResponse, _ error) {
 	s := subsetData.Subset
-	resourceName := helpers.MkResourceName(subsetData.Identifier)
 	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
 	uniqueName := helpers.MkSubsetUniqueName(s.Name, uniqueVersion)
-	subsetName := helpers.MKSubsetName(s)
-	owner := types.NamespacedName{Namespace: de.Namespace, Name: de.Name}
-	deploymentHandler := handlers.DeploymentHandler{
-		Client:         r.Client,
-		UniqueName:     helpers.MkSubsetUniqueName(s.Name, uniqueVersion),
-		UniqueVersion:  uniqueVersion,
-		SubsetName:     subsetName,
-		Owner:          owner,
-		BaseDeployment: subsetData.BaseDeployment,
-		DeploymentType: riskifiedv1alpha1.SUBSET,
-		LabelsToRemove: r.LabelsToRemove,
-		VersionLabel:   r.VersionLabel,
-		StatusManager:  subsetData.StatusManager,
-		Matches:        de.Spec.IstioMatches,
-		Subset:         s,
-		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
-		Ctx:            ctx,
-	}
-	response.deploymentHandler = &deploymentHandler
+	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.SUBSET, r.LabelsToRemove, r.VersionLabel, ctx)
+	response.deploymentHandler = deploymentHandler
 	if err := deploymentHandler.Handle(); err != nil {
 		response.msgs = response.msgs.AppendDeploymentMsg(err.Error())
 		return response, err
@@ -363,21 +328,8 @@ func (r *DynamicEnvReconciler) processSubset(
 		return response, fmt.Errorf("%s: %w", msg, err)
 	}
 
-	destinationRuleHandler := handlers.DestinationRuleHandler{
-		Client:         r.Client,
-		UniqueName:     uniqueName,
-		UniqueVersion:  uniqueVersion,
-		Namespace:      s.Namespace,
-		SubsetName:     subsetName,
-		VersionLabel:   r.VersionLabel,
-		DefaultVersion: defaultVersionForSubset,
-		StatusManager:  subsetData.StatusManager,
-		ServiceHosts:   serviceHosts,
-		Owner:          owner,
-		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
-		Ctx:            ctx,
-	}
-	response.mrHandlers = append(response.mrHandlers, &destinationRuleHandler)
+	destinationRuleHandler := handlers.NewDestinationRuleHandler(subsetData, r.VersionLabel, defaultVersionForSubset, serviceHosts, r.Client, ctx)
+	response.mrHandlers = append(response.mrHandlers, destinationRuleHandler)
 	if err := destinationRuleHandler.Handle(); err != nil {
 		response.msgs = response.msgs.AppendDestinationRuleMsg(err.Error())
 		return response, err
