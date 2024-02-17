@@ -51,7 +51,7 @@ type DynamicEnvReconciler struct {
 }
 
 type ReconcileLoopStatus struct {
-	returnError      error
+	returnError      model.NonMaskingError
 	cleanupError     error
 	cleanupProgress  bool
 	subsetMessages   map[string]riskifiedv1alpha1.SubsetMessages
@@ -71,12 +71,6 @@ type processStatusesResponse struct {
 	msgs     map[string][]string
 	degraded bool
 	nonReady map[string]bool
-}
-
-func (rls *ReconcileLoopStatus) setErrorIfNotMasking(err error) {
-	if rls.returnError == nil {
-		rls.returnError = err
-	}
 }
 
 func (rls *ReconcileLoopStatus) addDeploymentMessage(subset string, tpe riskifiedv1alpha1.SubsetOrConsumer, format string, a ...interface{}) {
@@ -175,7 +169,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err != nil {
 			log.Error(err, "couldn't find the deployment we need to override", "deployment-name", s.Name, "namespace", s.Namespace)
 			msg := fmt.Sprintf("couldn't find the deployment we need to override (name: %s, ns: %s)", s.Name, s.Namespace)
-			rls.returnError = fmt.Errorf("%s: %w", msg, err)
+			rls.returnError.ForceError(fmt.Errorf("%s: %w", msg, err))
 			rls.addDeploymentMessage(subsetName, st.Type, "%s, %v", msg, err)
 			rls.nonReadyCS[subsetName] = true
 			break
@@ -193,7 +187,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			handler, err := r.processConsumer(ctx, subsetData)
 			deploymentHandlers = append(deploymentHandlers, handler)
 			if err != nil {
-				rls.returnError = err
+				rls.returnError.ForceError(err)
 				rls.addDeploymentMessage(subsetName, riskifiedv1alpha1.CONSUMER, err.Error())
 			}
 		}
@@ -208,7 +202,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				rls.nonReadyCS[subsetName] = true
 			}
 			if err != nil {
-				rls.returnError = err
+				rls.returnError.ForceError(err)
 			}
 		}
 	}
@@ -216,12 +210,13 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if rls.cleanupError != nil {
 		// While the error occurred previously, these errors are less important than the main subsets loop, so we apply
 		// them now only if not masking.
-		rls.setErrorIfNotMasking(rls.returnError)
+		// TODO: This seem to originally be a bug - TEST!!
+		rls.returnError.SetIfNotMasking(rls.cleanupError)
 	}
 
 	response, err := r.processStatuses(ctx, deploymentHandlers, mrHandlers)
 	if err != nil {
-		rls.setErrorIfNotMasking(err)
+		rls.returnError.SetIfNotMasking(err)
 	}
 	if len(response.nonReady) > 0 {
 		nonReadyExists = true
@@ -240,7 +235,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if degradedExists {
 		globalState = riskifiedv1alpha1.Degraded
 	}
-	if rls.returnError != nil {
+	if !rls.returnError.IsNil() {
 		globalState = riskifiedv1alpha1.Degraded
 	}
 
@@ -252,21 +247,21 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			log.Info("Ignoring global status update error due to conflict")
 		} else {
 			log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
-			rls.setErrorIfNotMasking(err)
+			rls.returnError.SetIfNotMasking(err)
 		}
 	}
 
-	if nonReadyExists && rls.returnError == nil {
+	if nonReadyExists && rls.returnError.IsNil() {
 		// Currently we don't get updates on resource's status changes, so we need to requeue.
 		log.V(1).Info("Requeue because of non running status")
 		return ctrl.Result{Requeue: true}, nil
 	}
-	if errors.IsConflict(rls.returnError) {
+	if errors.IsConflict(rls.returnError.Get()) {
 		log.Info("Skipping conflict error")
 		// TODO: Do we really need to requeue? Because of the conflict it should run again anyway...
 		return ctrl.Result{Requeue: true}, nil
 	}
-	return ctrl.Result{}, rls.returnError
+	return ctrl.Result{}, rls.returnError.Get()
 }
 
 func (r *DynamicEnvReconciler) processConsumer(

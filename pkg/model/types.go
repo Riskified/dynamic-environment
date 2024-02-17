@@ -33,6 +33,15 @@ func (err *NonMaskingError) SetIfNotMasking(e error) {
 	}
 }
 
+// Set error regardless on current error
+func (err *NonMaskingError) ForceError(e error) {
+	err.error = e
+}
+
 func (err *NonMaskingError) Get() error {
 	return err.error
+}
+
+func (err *NonMaskingError) IsNil() bool {
+	return err.error == nil
 }
