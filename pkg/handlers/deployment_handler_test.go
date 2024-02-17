@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/riskified/dynamic-environment/pkg/helpers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"io"
 	"os"
@@ -187,7 +188,7 @@ var _ = Describe("DeploymentHandler", func() {
 				Client:       c,
 				UniqueName:   uniqueName,
 				VersionLabel: names.DefaultVersionLabel,
-				StatusHandler: &handlers.DynamicEnvStatusHandler{
+				StatusManager: &model.StatusManager{
 					Client:     c,
 					Ctx:        nil,
 					DynamicEnv: &de,

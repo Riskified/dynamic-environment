@@ -2,7 +2,6 @@ package model
 
 import (
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
-	"github.com/riskified/dynamic-environment/pkg/handlers"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -16,8 +15,8 @@ type DynamicEnvReconcileData struct {
 	BaseDeployment *appsv1.Deployment
 	// The current subset/consumer we're processing
 	Subset riskifiedv1alpha1.Subset
-	// StatusHandler
-	StatusHandler *handlers.DynamicEnvStatusHandler
+	// StatusManager
+	StatusManager *StatusManager
 	// The matches used for this resource
 	Matches []riskifiedv1alpha1.IstioMatch
 }

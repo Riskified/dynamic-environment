@@ -197,7 +197,8 @@ func (ch *CleanupHandler) cleanupVirtualServices() error {
 }
 
 func (ch *CleanupHandler) cleanupVirtualService(vs riskifiedv1alpha1.ResourceStatus) error {
-	version := helpers.UniqueDynamicEnvName(ch.DE)
+	// TODO: Can we not use DE?
+	version := helpers.UniqueDynamicEnvName(types.NamespacedName{Name: ch.DE.Name, Namespace: ch.DE.Namespace})
 	ch.Log.Info("Cleaning up Virtual Service ...", "virtual-service", vs)
 	found := istionetwork.VirtualService{}
 	if err := ch.Get(ch.Ctx, types.NamespacedName{Name: vs.Name, Namespace: vs.Namespace}, &found); err != nil {

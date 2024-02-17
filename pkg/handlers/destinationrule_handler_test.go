@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/handlers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"io"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -97,7 +98,7 @@ var _ = Describe("DestinationRuleHandler", func() {
 					UniqueName:   "unique",
 					Namespace:    "ns",
 					ServiceHosts: []string{"details", "service2"},
-					StatusHandler: &handlers.DynamicEnvStatusHandler{
+					StatusManager: &model.StatusManager{
 						Client:     mc,
 						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},
@@ -125,7 +126,7 @@ var _ = Describe("DestinationRuleHandler", func() {
 					UniqueName:   "unique",
 					Namespace:    "ns",
 					ServiceHosts: []string{"service1", "service2"},
-					StatusHandler: &handlers.DynamicEnvStatusHandler{
+					StatusManager: &model.StatusManager{
 						Client:     mc,
 						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},

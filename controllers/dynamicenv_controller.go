@@ -139,7 +139,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	nonReadyExists := false
 	degradedExists := false
 
-	statusHandler := handlers.DynamicEnvStatusHandler{
+	statusManager := model.StatusManager{
 		Client:     r.Client,
 		Ctx:        ctx,
 		DynamicEnv: dynamicEnv,
@@ -179,7 +179,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			Identifier:     types.NamespacedName{Namespace: dynamicEnv.Namespace, Name: dynamicEnv.Name},
 			BaseDeployment: baseDeployment,
 			Subset:         s,
-			StatusHandler:  &statusHandler,
+			StatusManager:  &statusManager,
 			Matches:        dynamicEnv.Spec.IstioMatches,
 		}
 
@@ -269,9 +269,9 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		globalState = riskifiedv1alpha1.Degraded
 	}
 
-	statusHandler.SyncSubsetMessagesToStatus(rls.subsetMessages)
-	statusHandler.SyncConsumerMessagesToStatus(rls.consumerMessages)
-	if err := statusHandler.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
+	statusManager.SyncSubsetMessagesToStatus(rls.subsetMessages)
+	statusManager.SyncConsumerMessagesToStatus(rls.consumerMessages)
+	if err := statusManager.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
 		// TODO: do we need this manual checking now that we're handling conflicts globally?
 		if errors.IsConflict(err) {
 			log.Info("Ignoring global status update error due to conflict")
@@ -299,10 +299,10 @@ func (r *DynamicEnvReconciler) processConsumer(
 	subsetData model.DynamicEnvReconcileData,
 	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove
 ) (handlers.SRHandler, error) {
-	uniqueVersion := helpers.UniqueDynamicEnvName(de)
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
 	deploymentHandler := handlers.DeploymentHandler{
 		Client:         r.Client,
-		UniqueName:     mkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion),
+		UniqueName:     helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion),
 		UniqueVersion:  uniqueVersion,
 		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
 		Owner:          subsetData.Identifier,
@@ -310,10 +310,10 @@ func (r *DynamicEnvReconciler) processConsumer(
 		DeploymentType: riskifiedv1alpha1.CONSUMER,
 		LabelsToRemove: r.LabelsToRemove,
 		VersionLabel:   r.VersionLabel,
-		StatusHandler:  subsetData.StatusHandler,
+		StatusManager:  subsetData.StatusManager,
 		Matches:        subsetData.Matches,
 		Subset:         subsetData.Subset,
-		Log:            helpers.MkLogger("DeploymentHandler", "resource", mkResourceName(subsetData.Identifier)),
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
 		Ctx:            ctx,
 	}
 	if err := deploymentHandler.Handle(); err != nil {
@@ -329,14 +329,14 @@ func (r *DynamicEnvReconciler) processSubset(
 	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove parameter
 ) (response processSubsetResponse, _ error) {
 	s := subsetData.Subset
-	resourceName := mkResourceName(subsetData.Identifier)
-	uniqueVersion := helpers.UniqueDynamicEnvName(de)
-	uniqueName := mkSubsetUniqueName(s.Name, uniqueVersion)
+	resourceName := helpers.MkResourceName(subsetData.Identifier)
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(s.Name, uniqueVersion)
 	subsetName := helpers.MKSubsetName(s)
 	owner := types.NamespacedName{Namespace: de.Namespace, Name: de.Name}
 	deploymentHandler := handlers.DeploymentHandler{
 		Client:         r.Client,
-		UniqueName:     mkSubsetUniqueName(s.Name, uniqueVersion),
+		UniqueName:     helpers.MkSubsetUniqueName(s.Name, uniqueVersion),
 		UniqueVersion:  uniqueVersion,
 		SubsetName:     subsetName,
 		Owner:          owner,
@@ -344,7 +344,7 @@ func (r *DynamicEnvReconciler) processSubset(
 		DeploymentType: riskifiedv1alpha1.SUBSET,
 		LabelsToRemove: r.LabelsToRemove,
 		VersionLabel:   r.VersionLabel,
-		StatusHandler:  subsetData.StatusHandler,
+		StatusManager:  subsetData.StatusManager,
 		Matches:        de.Spec.IstioMatches,
 		Subset:         s,
 		Log:            helpers.MkLogger("DeploymentHandler", "resource", resourceName),
@@ -371,7 +371,7 @@ func (r *DynamicEnvReconciler) processSubset(
 		SubsetName:     subsetName,
 		VersionLabel:   r.VersionLabel,
 		DefaultVersion: defaultVersionForSubset,
-		StatusHandler:  subsetData.StatusHandler,
+		StatusManager:  subsetData.StatusManager,
 		ServiceHosts:   serviceHosts,
 		Owner:          owner,
 		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", resourceName),
@@ -383,23 +383,9 @@ func (r *DynamicEnvReconciler) processSubset(
 		return response, err
 	}
 
-	virtualServiceHandler := handlers.VirtualServiceHandler{
-		Client:         r.Client,
-		UniqueName:     uniqueName,
-		UniqueVersion:  uniqueVersion,
-		RoutePrefix:    helpers.CalculateVirtualServicePrefix(uniqueVersion, s.Name),
-		Namespace:      s.Namespace,
-		SubsetName:     subsetName,
-		ServiceHosts:   serviceHosts,
-		DefaultVersion: defaultVersionForSubset,
-		DynamicEnv:     de,
-		StatusHandler:  subsetData.StatusHandler,
-		Log:            helpers.MkLogger("VirtualServiceHandler", "resource", resourceName),
-		Ctx:            ctx,
-	}
-
+	virtualServiceHandler := handlers.NewVirtualServiceHandler(subsetData, serviceHosts, defaultVersionForSubset, r.Client, ctx)
 	var returnError error // so we'll be able to test for commonHost even if an error occurred.
-	response.mrHandlers = append(response.mrHandlers, &virtualServiceHandler)
+	response.mrHandlers = append(response.mrHandlers, virtualServiceHandler)
 	if err := virtualServiceHandler.Handle(); err != nil {
 		if errors.IsConflict(err) {
 			// TODO: Check the option for removal of this spacial clause. We already handle conflicts in the end of the reconcile loop.
@@ -505,12 +491,4 @@ func mergeSubsetsAndConsumers(subsets, consumers []riskifiedv1alpha1.Subset) []r
 
 func markedForDeletion(de *riskifiedv1alpha1.DynamicEnv) bool {
 	return de.DeletionTimestamp != nil
-}
-
-func mkSubsetUniqueName(name, version string) string {
-	return name + "-" + version
-}
-
-func mkResourceName(id types.NamespacedName) string {
-	return fmt.Sprintf("%s/%s", id.Namespace, id.Name)
 }

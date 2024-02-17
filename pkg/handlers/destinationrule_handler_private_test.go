@@ -68,7 +68,7 @@ var _ = Describe("Accepting alternative version label and version", func() {
 			Namespace:      "namespace",
 			VersionLabel:   versionLabel,
 			DefaultVersion: version,
-			StatusHandler:  nil,
+			StatusManager:  nil,
 			ServiceHosts:   []string{serviceName},
 			Owner:          types.NamespacedName{},
 			Log:            logr.Logger{},

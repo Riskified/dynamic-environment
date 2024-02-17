@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/riskified/dynamic-environment/pkg/model"
 
 	"github.com/riskified/dynamic-environment/extensions"
 
@@ -56,7 +57,7 @@ type DeploymentHandler struct {
 	// The version label to use
 	VersionLabel string
 	// Status handler (to be able to update status)
-	StatusHandler *DynamicEnvStatusHandler
+	StatusManager *model.StatusManager
 	// The DynamicEnv matchers
 	Matches []riskifiedv1alpha1.IstioMatch
 	// An indicator whether the current deployment is updating (as opposed to initializing).
@@ -91,7 +92,7 @@ func (h *DeploymentHandler) Handle() error {
 		if err != nil {
 			return fmt.Errorf("calculating hash for %q: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash on deployment creation %q: %w", h.UniqueName, err)
 		}
 
@@ -148,7 +149,7 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 }
 
 func (h *DeploymentHandler) ApplyStatus(rs riskifiedv1alpha1.ResourceStatus) error {
-	return h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, rs, h.DeploymentType)
+	return h.StatusManager.AddDeploymentStatusEntry(h.SubsetName, rs, h.DeploymentType)
 }
 
 func (h *DeploymentHandler) GetSubset() string {
@@ -160,9 +161,9 @@ func (h *DeploymentHandler) UpdateIfRequired() error {
 	s := h.Subset
 	var existingHash uint64
 	if h.DeploymentType == riskifiedv1alpha1.CONSUMER {
-		existingHash = h.StatusHandler.GetHashForConsumer(h.SubsetName)
+		existingHash = h.StatusManager.GetHashForConsumer(h.SubsetName)
 	} else {
-		existingHash = h.StatusHandler.GetHashForSubset(h.SubsetName)
+		existingHash = h.StatusManager.GetHashForSubset(h.SubsetName)
 	}
 	hash, err := hashstructure.Hash(h.Subset, hashstructure.FormatV2, nil)
 	if err != nil {
@@ -182,7 +183,7 @@ func (h *DeploymentHandler) UpdateIfRequired() error {
 			h.Log.Error(err, "Updating Subset", "subset full name", h.UniqueName)
 			return fmt.Errorf("error updating subset %s: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash for '%s': %w", h.UniqueName, err)
 		}
 	}
@@ -259,7 +260,7 @@ func (h *DeploymentHandler) setStatus(status riskifiedv1alpha1.LifeCycleStatus) 
 		Namespace: h.Subset.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, currentState, h.DeploymentType); err != nil {
+	if err := h.StatusManager.AddDeploymentStatusEntry(h.SubsetName, currentState, h.DeploymentType); err != nil {
 		return err
 	}
 	return nil

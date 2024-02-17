@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"k8s.io/utils/strings/slices"
 
 	"github.com/go-logr/logr"
@@ -50,7 +51,7 @@ type DestinationRuleHandler struct {
 	// The version that gets the default route
 	DefaultVersion string
 	// Status handler (to be able to update status)
-	StatusHandler *DynamicEnvStatusHandler
+	StatusManager *model.StatusManager
 	// The host name of the service that points to the Deployment specified in
 	// the subset.
 	ServiceHosts []string
@@ -122,7 +123,7 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 
 func (h *DestinationRuleHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusHandler.AddDestinationRuleStatusEntry(h.SubsetName, rs); err != nil {
+		if err := h.StatusManager.AddDestinationRuleStatusEntry(h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -212,7 +213,7 @@ func (h *DestinationRuleHandler) setStatus(subset, drName string, status riskifi
 		Namespace: h.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusHandler.AddDestinationRuleStatusEntry(subset, currentState); err != nil {
+	if err := h.StatusManager.AddDestinationRuleStatusEntry(subset, currentState); err != nil {
 		return err
 	}
 	return nil

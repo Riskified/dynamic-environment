@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package handlers_test
+package model_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
-	"github.com/riskified/dynamic-environment/pkg/handlers"
 )
 
 var _ = Describe("SyncStatusResources", func() {
@@ -48,7 +48,7 @@ var _ = Describe("SyncStatusResources", func() {
 			modified bool,
 			expected []riskifiedv1alpha1.ResourceStatus,
 		) {
-			m, result := handlers.SyncStatusResources(s, resources)
+			m, result := model.SyncStatusResources(s, resources)
 			Expect(result).To(Equal(expected))
 			Expect(m).To(Equal(modified))
 		},
@@ -151,7 +151,7 @@ var _ = Describe("SyncGlobalErrors", func() {
 			time.Sleep(200 * time.Microsecond) // force after
 			var currentErrors []riskifiedv1alpha1.StatusError
 			msg := "This is an error"
-			result := handlers.SyncGlobalErrors(msg, currentErrors)
+			result := model.SyncGlobalErrors(msg, currentErrors)
 			Expect(result).To(HaveLen(1))
 			e1 := result[0]
 			Expect(e1.Error).Should(Equal(msg))
@@ -170,7 +170,7 @@ var _ = Describe("SyncGlobalErrors", func() {
 						LastOccurrence: currentErrorTime,
 					},
 				}
-				result := handlers.SyncGlobalErrors(msg, current)
+				result := model.SyncGlobalErrors(msg, current)
 				Expect(result).To(HaveLen(1))
 				e1 := result[0]
 				Expect(e1.Error).Should(Equal(msg))
@@ -190,7 +190,7 @@ var _ = Describe("SyncGlobalErrors", func() {
 					},
 					riskifiedv1alpha1.NewStatusError("Different error 2"),
 				}
-				result := handlers.SyncGlobalErrors(msg, current)
+				result := model.SyncGlobalErrors(msg, current)
 				Expect(result).To(HaveLen(3))
 				idx := findErrorIndex(msg, result)
 				err := result[idx]
@@ -205,7 +205,7 @@ var _ = Describe("SyncGlobalErrors", func() {
 					riskifiedv1alpha1.NewStatusError("Different error 1"),
 					riskifiedv1alpha1.NewStatusError("Different error 2"),
 				}
-				result := handlers.SyncGlobalErrors(msg, current)
+				result := model.SyncGlobalErrors(msg, current)
 				Expect(result).To(HaveLen(3))
 				_ = findErrorIndex(msg, result)
 				// If last call did not panic than we're ok.
@@ -305,8 +305,8 @@ var _ = Describe("SyncSubsetMessagesToStatus", func() {
 		},
 	}
 
-	mkStatusHandler := func() *handlers.DynamicEnvStatusHandler {
-		return &handlers.DynamicEnvStatusHandler{
+	mkStatusManager := func() *model.StatusManager {
+		return &model.StatusManager{
 			DynamicEnv: &riskifiedv1alpha1.DynamicEnv{
 				Status: riskifiedv1alpha1.DynamicEnvStatus{
 					SubsetsStatus: make(map[string]riskifiedv1alpha1.SubsetStatus),
@@ -324,12 +324,12 @@ var _ = Describe("SyncSubsetMessagesToStatus", func() {
 
 	Context("With empty status", func() {
 		It("should include all messages", func() {
-			h := mkStatusHandler()
+			h := mkStatusManager()
 			h.SyncSubsetMessagesToStatus(nonEmptyMessages)
 			result := h.DynamicEnv.Status.SubsetsStatus
 			Expect(result).To(HaveLen(2))
-			errors1 := handlers.SafeGetSubsetErrors(result["subset1"])
-			errors2 := handlers.SafeGetSubsetErrors(result["subset2"])
+			errors1 := model.SafeGetSubsetErrors(result["subset1"])
+			errors2 := model.SafeGetSubsetErrors(result["subset2"])
 			Expect(errors1.Deployment[0].Error).To(Equal(st1msgDeploy))
 			Expect(errors1.DestinationRule[0].Error).To(Equal(st1msgDR))
 			Expect(errors1.VirtualServices[0].Error).To(Equal(st1msgVS))
@@ -343,7 +343,7 @@ var _ = Describe("SyncSubsetMessagesToStatus", func() {
 
 	Context("With no messages", func() {
 		It("should leave status the same", func() {
-			h := mkStatusHandler()
+			h := mkStatusManager()
 			h.DynamicEnv.Status.SubsetsStatus = nonEmptyStatus
 			h.SyncSubsetMessagesToStatus(make(map[string]riskifiedv1alpha1.SubsetMessages))
 			result := h.DynamicEnv.Status.SubsetsStatus
@@ -353,7 +353,7 @@ var _ = Describe("SyncSubsetMessagesToStatus", func() {
 
 	Context("With both status and messages", func() {
 		It("should merge messages", func() {
-			h := mkStatusHandler()
+			h := mkStatusManager()
 			h.DynamicEnv.Status.SubsetsStatus = nonEmptyStatus
 			h.SyncSubsetMessagesToStatus(nonEmptyMessages)
 			subset1 := h.DynamicEnv.Status.SubsetsStatus["subset1"]
