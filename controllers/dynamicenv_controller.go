@@ -118,15 +118,15 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	resourceName := fmt.Sprintf("%s/%s", dynamicEnv.Namespace, dynamicEnv.Name)
 	log := log.WithValues("resource", resourceName)
 
-	cleanupHandler := handlers.CleanupHandler{
+	cleanupManager := model.CleanupManager{
 		Client: r.Client,
 		Ctx:    ctx,
-		Log:    helpers.MkLogger("CleanupHandler", "resource", resourceName),
+		Log:    helpers.MkLogger("CleanupManager", "resource", resourceName),
 		DE:     dynamicEnv,
 	}
 
 	if markedForDeletion(dynamicEnv) {
-		return cleanupHandler.DeleteAllResources()
+		return cleanupManager.DeleteAllResources()
 	}
 
 	if err := r.addFinalizersIfRequired(ctx, dynamicEnv); err != nil {
@@ -147,9 +147,9 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	subsetsAndConsumers := mergeSubsetsAndConsumers(dynamicEnv.Spec.Subsets, dynamicEnv.Spec.Consumers)
 
-	toRemove := cleanupHandler.CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers)
+	toRemove := cleanupManager.CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers)
 	if len(toRemove) > 0 {
-		inProgress, err := cleanupHandler.RemoveSubsetsAndConsumers(toRemove)
+		inProgress, err := cleanupManager.RemoveSubsetsAndConsumers(toRemove)
 		if err != nil {
 			rls.cleanupError = err
 		}
