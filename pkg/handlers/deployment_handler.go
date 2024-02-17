@@ -46,11 +46,11 @@ type DeploymentHandler struct {
 	UniqueVersion string
 	// The name of the subset/consumer as it appears in the Status map
 	SubsetName string
-	// THe owner of the deployment we need to handle (e.g. to configure watches)
+	// THe owner of the deployment we need to handle (e.g., to configure watches)
 	Owner types.NamespacedName
 	// The deployment we should use as base
 	BaseDeployment *appsv1.Deployment
-	// Is it a consumer or subset
+	// Is it a Consumer or Subset
 	DeploymentType riskifiedv1alpha1.SubsetOrConsumer
 	// A list of labels to be removed from the overriding deployment
 	LabelsToRemove []string
@@ -65,7 +65,6 @@ type DeploymentHandler struct {
 	// The subset that contains the data of our deployment
 	Subset riskifiedv1alpha1.Subset
 	Log    logr.Logger
-	Ctx    context.Context
 }
 
 // Initializes DeploymentHandler with provided and default values
@@ -75,7 +74,6 @@ func NewDeploymentHandler(
 	dt riskifiedv1alpha1.SubsetOrConsumer,
 	labelsToRemove []string,
 	versionLabel string,
-	ctx context.Context, // TODO: remove this
 ) *DeploymentHandler {
 	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
 	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
@@ -94,16 +92,15 @@ func NewDeploymentHandler(
 		Updating:       false,
 		Subset:         subsetData.Subset,
 		Log:            helpers.MkLogger("DeploymentHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
-		Ctx:            ctx,
 	}
 }
 
 // Handles creation and manipulation of related Deployments.
-func (h *DeploymentHandler) Handle() error {
+func (h *DeploymentHandler) Handle(ctx context.Context) error {
 	subset := h.Subset
 	sDeployment := &appsv1.Deployment{}
 	searchName := types.NamespacedName{Name: h.UniqueName, Namespace: subset.Namespace}
-	err := h.Get(h.Ctx, searchName, sDeployment)
+	err := h.Get(ctx, searchName, sDeployment)
 	if err != nil && errors.IsNotFound(err) {
 		if err := h.setStatus(riskifiedv1alpha1.Initializing); err != nil {
 			return fmt.Errorf("failed to update status (prior to adding deployment: %s): %w", h.UniqueName, err)
@@ -113,7 +110,7 @@ func (h *DeploymentHandler) Handle() error {
 			return err2
 		}
 		h.Log.Info("Deploying newly created overriding deployment", "namespace", subset.Namespace, "name", subset.Name)
-		err2 = h.Create(h.Ctx, sDeployment)
+		err2 = h.Create(ctx, sDeployment)
 		if err2 != nil {
 			h.Log.Error(err, "Error deploying", "namespace", subset.Namespace, "name", subset.Name)
 			return err2
@@ -131,10 +128,10 @@ func (h *DeploymentHandler) Handle() error {
 		h.Log.Error(err, "Failed to get matching deployment for subset")
 		return err
 	}
-	return h.UpdateIfRequired()
+	return h.UpdateIfRequired(ctx)
 }
 
-func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error) {
+func (h *DeploymentHandler) GetStatus(ctx context.Context) (riskifiedv1alpha1.ResourceStatus, error) {
 
 	genStatus := func(s riskifiedv1alpha1.LifeCycleStatus) riskifiedv1alpha1.ResourceStatus {
 		return riskifiedv1alpha1.ResourceStatus{
@@ -146,7 +143,7 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 
 	deployment := &appsv1.Deployment{}
 	searchName := types.NamespacedName{Name: h.UniqueName, Namespace: h.Subset.Namespace}
-	if err := h.Get(h.Ctx, searchName, deployment); err != nil {
+	if err := h.Get(ctx, searchName, deployment); err != nil {
 		if errors.IsNotFound(err) {
 			return genStatus(riskifiedv1alpha1.Missing), nil
 		} else {
@@ -186,7 +183,7 @@ func (h *DeploymentHandler) GetSubset() string {
 	return h.SubsetName
 }
 
-func (h *DeploymentHandler) UpdateIfRequired() error {
+func (h *DeploymentHandler) UpdateIfRequired(ctx context.Context) error {
 	h.Log.V(1).Info("Checking whether it's required to update subset", "subset namespace", h.Subset.Namespace, "subset name", h.Subset.Name)
 	s := h.Subset
 	var existingHash uint64
@@ -209,7 +206,7 @@ func (h *DeploymentHandler) UpdateIfRequired() error {
 		if err := h.setStatus(riskifiedv1alpha1.Updating); err != nil {
 			return fmt.Errorf("failed to update status (prior to update deployment: %s): %w", h.UniqueName, err)
 		}
-		if err := h.Update(h.Ctx, newDeployment); err != nil {
+		if err := h.Update(ctx, newDeployment); err != nil {
 			h.Log.Error(err, "Updating Subset", "subset full name", h.UniqueName)
 			return fmt.Errorf("error updating subset %s: %w", h.UniqueName, err)
 		}

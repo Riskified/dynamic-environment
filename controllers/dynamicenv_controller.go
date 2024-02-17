@@ -193,7 +193,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 
 		if st.Type == riskifiedv1alpha1.SUBSET {
-			response, err := r.processSubset(ctx, subsetData, defaultVersionForSubset, dynamicEnv)
+			response, err := r.processSubset(ctx, subsetData, defaultVersionForSubset)
 			deploymentHandlers = append(deploymentHandlers, response.deploymentHandler)
 			mrHandlers = append(mrHandlers, response.mrHandlers...)
 			rls.subsetMessages[subsetName] = response.msgs
@@ -214,7 +214,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	for _, handler := range deploymentHandlers {
-		newStatus, err := handler.GetStatus()
+		newStatus, err := handler.GetStatus(ctx)
 		if err != nil {
 			rls.setErrorIfNotMasking(err)
 			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error fetching status: %s", err)
@@ -235,7 +235,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 	for _, handler := range mrHandlers {
-		statuses, err := handler.GetStatus()
+		statuses, err := handler.GetStatus(ctx)
 		if err != nil {
 			rls.setErrorIfNotMasking(err)
 			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error fetching status: %s", err)
@@ -298,8 +298,8 @@ func (r *DynamicEnvReconciler) processConsumer(
 	ctx context.Context,
 	subsetData model.DynamicEnvReconcileData,
 ) (handlers.SRHandler, error) {
-	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.CONSUMER, r.LabelsToRemove, r.VersionLabel, ctx)
-	if err := deploymentHandler.Handle(); err != nil {
+	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.CONSUMER, r.LabelsToRemove, r.VersionLabel)
+	if err := deploymentHandler.Handle(ctx); err != nil {
 		return deploymentHandler, err
 	}
 	return deploymentHandler, nil
@@ -309,14 +309,13 @@ func (r *DynamicEnvReconciler) processSubset(
 	ctx context.Context,
 	subsetData model.DynamicEnvReconcileData,
 	defaultVersionForSubset string,
-	de *riskifiedv1alpha1.DynamicEnv, // TODO: remove parameter
 ) (response processSubsetResponse, _ error) {
 	s := subsetData.Subset
 	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
 	uniqueName := helpers.MkSubsetUniqueName(s.Name, uniqueVersion)
-	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.SUBSET, r.LabelsToRemove, r.VersionLabel, ctx)
+	deploymentHandler := handlers.NewDeploymentHandler(subsetData, r.Client, riskifiedv1alpha1.SUBSET, r.LabelsToRemove, r.VersionLabel)
 	response.deploymentHandler = deploymentHandler
-	if err := deploymentHandler.Handle(); err != nil {
+	if err := deploymentHandler.Handle(ctx); err != nil {
 		response.msgs = response.msgs.AppendDeploymentMsg(err.Error())
 		return response, err
 	}
@@ -328,17 +327,17 @@ func (r *DynamicEnvReconciler) processSubset(
 		return response, fmt.Errorf("%s: %w", msg, err)
 	}
 
-	destinationRuleHandler := handlers.NewDestinationRuleHandler(subsetData, r.VersionLabel, defaultVersionForSubset, serviceHosts, r.Client, ctx)
+	destinationRuleHandler := handlers.NewDestinationRuleHandler(subsetData, r.VersionLabel, defaultVersionForSubset, serviceHosts, r.Client)
 	response.mrHandlers = append(response.mrHandlers, destinationRuleHandler)
-	if err := destinationRuleHandler.Handle(); err != nil {
+	if err := destinationRuleHandler.Handle(ctx); err != nil {
 		response.msgs = response.msgs.AppendDestinationRuleMsg(err.Error())
 		return response, err
 	}
 
-	virtualServiceHandler := handlers.NewVirtualServiceHandler(subsetData, serviceHosts, defaultVersionForSubset, r.Client, ctx)
+	virtualServiceHandler := handlers.NewVirtualServiceHandler(subsetData, serviceHosts, defaultVersionForSubset, r.Client)
 	var returnError error // so we'll be able to test for commonHost even if an error occurred.
 	response.mrHandlers = append(response.mrHandlers, virtualServiceHandler)
-	if err := virtualServiceHandler.Handle(); err != nil {
+	if err := virtualServiceHandler.Handle(ctx); err != nil {
 		if errors.IsConflict(err) {
 			// TODO: Check the option for removal of this spacial clause. We already handle conflicts in the end of the reconcile loop.
 			log.V(1).Info("ignoring update error due to version conflict", "error", err)

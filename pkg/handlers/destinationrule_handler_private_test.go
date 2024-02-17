@@ -16,10 +16,9 @@ limitations under the License.
 
 package handlers
 
-// IMPORTANT: While it's generally bad practice to test private functions, I do it here in order to
-// avoid overly specified tests from the outside. If these test fails (e.g. we changed
-// implementation) just delete the failing tests (of-course, make sure you test the new
-// functionality :) ).
+// IMPORTANT: While it's generally bad practice to test private functions, I do it here to avoid overly specified tests
+// from the outside. If these tests fail (e.g., we changed implementation) delete the failing tests (make sure you test
+// the new functionality :) ).
 
 import (
 	"context"
@@ -72,9 +71,8 @@ var _ = Describe("Accepting alternative version label and version", func() {
 			ServiceHosts:   []string{serviceName},
 			Owner:          types.NamespacedName{},
 			Log:            logr.Logger{},
-			Ctx:            nil,
 		}
-		dr, err := h.generateOverridingDestinationRule(serviceName)
+		dr, err := h.generateOverridingDestinationRule(nil, serviceName)
 		Expect(err).To(BeNil())
 		Expect(dr).NotTo(BeNil())
 	})

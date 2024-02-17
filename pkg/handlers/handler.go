@@ -17,13 +17,14 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 )
 
 // Common functionality for SRHandler and MRHandler
 type BaseHandler interface {
 	// An entry point to the handler. Takes care of initializing / updating the resource.
-	Handle() error
+	Handle(context.Context) error
 	// Get the subset unique name for this handler
 	GetSubset() string
 }
@@ -33,7 +34,7 @@ type SRHandler interface {
 	BaseHandler
 	// Computes what the current status of the resource should be. It does not
 	// update the status, just computes what the current status should be.
-	GetStatus() (riskifiedv1alpha1.ResourceStatus, error)
+	GetStatus(ctx context.Context) (riskifiedv1alpha1.ResourceStatus, error)
 	// Apply the provided status to the DynamicEnvironment.
 	ApplyStatus(riskifiedv1alpha1.ResourceStatus) error
 }
@@ -43,7 +44,7 @@ type MRHandler interface {
 	BaseHandler
 	// Computes the status of all the services which are affected by this handler. It doesn't change
 	// anything, just returns the found statuses.
-	GetStatus() ([]riskifiedv1alpha1.ResourceStatus, error)
+	GetStatus(ctx context.Context) ([]riskifiedv1alpha1.ResourceStatus, error)
 	// Apply the provided status to the DynamicEnvironment.
 	ApplyStatus([]riskifiedv1alpha1.ResourceStatus) error
 	/// GetHosts returns non-missing hosts.

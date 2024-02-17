@@ -72,7 +72,7 @@ var _ = Describe("DestinationRuleHandler", func() {
 						Status:    riskifiedv1alpha1.Missing,
 					},
 				}
-				result, err := handler.GetStatus()
+				result, err := handler.GetStatus(context.Background())
 				Expect(err).To(BeNil())
 				Expect(result).To(Equal(expected))
 			})
@@ -100,12 +100,11 @@ var _ = Describe("DestinationRuleHandler", func() {
 					ServiceHosts: []string{"details", "service2"},
 					StatusManager: &model.StatusManager{
 						Client:     mc,
-						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},
 					},
 					Log: ctrl.Log,
 				}
-				err := handler.Handle()
+				err := handler.Handle(context.Background())
 				Expect(err).To(BeNil())
 			})
 
@@ -133,7 +132,7 @@ var _ = Describe("DestinationRuleHandler", func() {
 					},
 					Log: ctrl.Log,
 				}
-				err := handler.Handle()
+				err := handler.Handle(context.Background())
 				Expect(err).NotTo(BeNil())
 				Expect(err.Error()).To(ContainSubstring("no base destination rules"))
 			})
