@@ -20,3 +20,19 @@ type DynamicEnvReconcileData struct {
 	// The matches used for this resource
 	Matches []riskifiedv1alpha1.IstioMatch
 }
+
+// A struct to prevent masking one error with different (less important) one
+type NonMaskingError struct {
+	error error
+}
+
+// Only set the error if error is nil
+func (err *NonMaskingError) SetIfNotMasking(e error) {
+	if err.error == nil {
+		err.error = e
+	}
+}
+
+func (err *NonMaskingError) Get() error {
+	return err.error
+}

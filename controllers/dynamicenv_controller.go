@@ -67,6 +67,12 @@ type processSubsetResponse struct {
 	noCommonHost      bool
 }
 
+type processStatusesResponse struct {
+	msgs     map[string][]string
+	degraded bool
+	nonReady map[string]bool
+}
+
 func (rls *ReconcileLoopStatus) setErrorIfNotMasking(err error) {
 	if rls.returnError == nil {
 		rls.returnError = err
@@ -213,46 +219,15 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		rls.setErrorIfNotMasking(rls.returnError)
 	}
 
-	for _, handler := range deploymentHandlers {
-		newStatus, err := handler.GetStatus(ctx)
-		if err != nil {
-			rls.setErrorIfNotMasking(err)
-			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error fetching status: %s", err)
-			continue
-		}
-		log.Info("Handler returned status", "status", newStatus)
-		if err = handler.ApplyStatus(newStatus); err != nil {
-			log.Error(err, "error updating status", "status", newStatus)
-			rls.setErrorIfNotMasking(err)
-			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error updating status: %s", err)
-		}
-		if newStatus.Status != riskifiedv1alpha1.Running {
-			nonReadyExists = true
-			rls.nonReadyCS[handler.GetSubset()] = true
-		}
-		if newStatus.Status.IsFailedStatus() {
-			degradedExists = true
-		}
+	response, err := r.processStatuses(ctx, deploymentHandlers, mrHandlers)
+	if err != nil {
+		rls.setErrorIfNotMasking(err)
 	}
-	for _, handler := range mrHandlers {
-		statuses, err := handler.GetStatus(ctx)
-		if err != nil {
-			rls.setErrorIfNotMasking(err)
-			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error fetching status: %s", err)
-			continue
-		}
-		log.Info("MRHandler returned statuses", "statuses", statuses)
-		if err = handler.ApplyStatus(statuses); err != nil {
-			log.Error(err, "error updating status", "statuses", statuses)
-			rls.setErrorIfNotMasking(err)
-			rls.subsetMessages[handler.GetSubset()] = rls.subsetMessages[handler.GetSubset()].AppendGlobalMsg("error updating status: %s", err)
-		}
-		for _, s := range statuses {
-			if s.Status.IsFailedStatus() {
-				rls.nonReadyCS[handler.GetSubset()] = true
-				degradedExists = true
-			}
-		}
+	if len(response.nonReady) > 0 {
+		nonReadyExists = true
+	}
+	for k, v := range response.nonReady {
+		rls.nonReadyCS[k] = v
 	}
 
 	if rls.cleanupProgress {
@@ -356,6 +331,59 @@ func (r *DynamicEnvReconciler) processSubset(
 	}
 
 	return response, returnError
+}
+
+func (r *DynamicEnvReconciler) processStatuses(ctx context.Context, srhs []handlers.SRHandler, mrhs []handlers.MRHandler) (processStatusesResponse, error) {
+	response := processStatusesResponse{
+		msgs:     make(map[string][]string),
+		nonReady: make(map[string]bool),
+		degraded: false,
+	}
+	var returnError model.NonMaskingError
+
+	for _, handler := range srhs {
+		newStatus, err := handler.GetStatus(ctx)
+		if err != nil {
+			returnError.SetIfNotMasking(err)
+			response.msgs[handler.GetSubset()] = append(response.msgs[handler.GetSubset()], fmt.Sprintf("error fetching status: %s", err))
+			continue
+		}
+		log.Info("Handler returned status", "status", newStatus)
+		if err = handler.ApplyStatus(newStatus); err != nil {
+			log.Error(err, "error updating status", "status", newStatus)
+			returnError.SetIfNotMasking(err)
+			response.msgs[handler.GetSubset()] = append(response.msgs[handler.GetSubset()], fmt.Sprintf("error updating status: %s", err))
+		}
+		if newStatus.Status != riskifiedv1alpha1.Running {
+			response.nonReady[handler.GetSubset()] = true
+		}
+		if newStatus.Status.IsFailedStatus() {
+			response.degraded = true
+		}
+	}
+	for _, handler := range mrhs {
+		statuses, err := handler.GetStatus(ctx)
+		if err != nil {
+			msg := fmt.Sprintf("error fetching status: %s", err)
+			returnError.SetIfNotMasking(err)
+			response.msgs[handler.GetSubset()] = append(response.msgs[handler.GetSubset()], msg)
+			continue
+		}
+		log.Info("MRHandler returned statuses", "statuses", statuses)
+		if err = handler.ApplyStatus(statuses); err != nil {
+			log.Error(err, "error updating status", "statuses", statuses)
+			msg := fmt.Sprintf("error updating status: %s", err)
+			returnError.SetIfNotMasking(err)
+			response.msgs[handler.GetSubset()] = append(response.msgs[handler.GetSubset()], msg)
+		}
+		for _, s := range statuses {
+			if s.Status.IsFailedStatus() {
+				response.nonReady[handler.GetSubset()] = true
+				response.degraded = true
+			}
+		}
+	}
+	return response, returnError.Get()
 }
 
 func (r *DynamicEnvReconciler) locateMatchingServiceHostnames(ctx context.Context, namespace string, ls labels.Set) (serviceHosts []string, err error) {
