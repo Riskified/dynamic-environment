@@ -423,16 +423,6 @@ func (r *DynamicEnvReconciler) addFinalizersIfRequired(ctx context.Context, de *
 	return nil
 }
 
-func (r *DynamicEnvReconciler) deleteFinalizer(ctx context.Context, finalizer string, de *riskifiedv1alpha1.DynamicEnv) error {
-	log.Info("Deleting finalizer from dynamic env", "finalizer", finalizer)
-	remainingFinalizers := helpers.RemoveItemFromStringSlice(finalizer, de.Finalizers)
-	de.Finalizers = remainingFinalizers
-	if err := r.Update(ctx, de); err != nil {
-		return fmt.Errorf("error removing %s finalizer: %w", finalizer, err)
-	}
-	return nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).

@@ -72,7 +72,7 @@ var _ = Describe("Accepting alternative version label and version", func() {
 			Owner:          types.NamespacedName{},
 			Log:            logr.Logger{},
 		}
-		dr, err := h.generateOverridingDestinationRule(nil, serviceName)
+		dr, err := h.generateOverridingDestinationRule(context.Background(), serviceName)
 		Expect(err).To(BeNil())
 		Expect(dr).NotTo(BeNil())
 	})
