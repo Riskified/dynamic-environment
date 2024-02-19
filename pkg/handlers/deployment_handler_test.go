@@ -176,8 +176,6 @@ var _ = Describe("DeploymentHandler", func() {
 				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
-
-			// TODO: Do we need to test of ReplicaFailure condition?
 		})
 	})
 

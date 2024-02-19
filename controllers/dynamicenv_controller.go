@@ -149,7 +149,6 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if cleanupError != nil {
 		// While the error occurred previously, these errors are less important than the main subsets loop, so we apply
 		// them now only if not masking.
-		// TODO: This seem to originally be a bug - TEST!!
 		rls.returnError.SetIfNotMasking(cleanupError)
 	}
 
@@ -181,13 +180,8 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	statusManager.SyncSubsetMessagesToStatus(rls.subsetMessages)
 	statusManager.SyncConsumerMessagesToStatus(rls.consumerMessages)
 	if err := statusManager.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
-		// TODO: do we need this manual checking now that we're handling conflicts globally?
-		if errors.IsConflict(err) {
-			log.Info("Ignoring global status update error due to conflict")
-		} else {
-			log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
-			rls.returnError.SetIfNotMasking(err)
-		}
+		log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
+		rls.returnError.SetIfNotMasking(err)
 	}
 
 	if nonReadyExists && rls.returnError.IsNil() {
@@ -273,15 +267,10 @@ func (r *DynamicEnvReconciler) processSubsetsAndConsumers(
 			virtualServiceHandler := handlers.NewVirtualServiceHandler(subsetData, serviceHosts, defaultVersionForSubset, r.Client)
 			mrHandlers = append(mrHandlers, virtualServiceHandler)
 			if err := virtualServiceHandler.Handle(ctx); err != nil {
-				if errors.IsConflict(err) {
-					// TODO: do we need to handle this? we're already managing it globally
-					log.V(1).Info("ignoring update error due to version conflict", "error", err)
-				} else {
-					log.Error(err, "error updating virtual service for subset", "subset", s.Name)
-					msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
-					rls.returnError.ForceError(fmt.Errorf("%s: %w", msg, err))
-					rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendVirtualServiceMsg("%s: %s", msg, err)
-				}
+				log.Error(err, "error updating virtual service for subset", "subset", s.Name)
+				msg := fmt.Sprintf("error updating virtual service for subset (%s)", uniqueName)
+				rls.returnError.ForceError(fmt.Errorf("%s: %w", msg, err))
+				rls.subsetMessages[subsetName] = rls.subsetMessages[subsetName].AppendVirtualServiceMsg("%s: %s", msg, err)
 			}
 
 			commonHostExists := helpers.CommonValueExists(destinationRuleHandler.GetHosts(), virtualServiceHandler.GetHosts())

@@ -311,12 +311,6 @@ func createContainerTemplate(containers []v1.Container, containerOverrides riski
 
 // Returns the container with the specified name. Fails if not found
 func findContainerIndex(containers *[]v1.Container, defaultName string) (int, error) {
-	if len(*containers) < 1 {
-		// Todo: How do we need to treat this situation? Is it even possible to have empty container list?
-		//goland:noinspection GoErrorStringFormat
-		return 0, fmt.Errorf("how did we get empty container list?")
-	}
-
 	for idx, c := range *containers {
 		if c.Name == defaultName {
 			return idx, nil
