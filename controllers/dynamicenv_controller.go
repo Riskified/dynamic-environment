@@ -390,17 +390,17 @@ func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func mergeSubsetsAndConsumers(subsets, consumers []riskifiedv1alpha1.Subset) []riskifiedv1alpha1.SubsetType {
-	var result []riskifiedv1alpha1.SubsetType
+func mergeSubsetsAndConsumers(subsets, consumers []riskifiedv1alpha1.Subset) []model.SubsetType {
+	var result []model.SubsetType
 	for _, s := range subsets {
-		st := riskifiedv1alpha1.SubsetType{
+		st := model.SubsetType{
 			Type:   riskifiedv1alpha1.SUBSET,
 			Subset: s,
 		}
 		result = append(result, st)
 	}
 	for _, s := range consumers {
-		st := riskifiedv1alpha1.SubsetType{
+		st := model.SubsetType{
 			Type:   riskifiedv1alpha1.CONSUMER,
 			Subset: s,
 		}

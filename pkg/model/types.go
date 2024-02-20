@@ -45,3 +45,8 @@ func (err *NonMaskingError) Get() error {
 func (err *NonMaskingError) IsNil() bool {
 	return err.error == nil
 }
+
+type SubsetType struct {
+	Type   riskifiedv1alpha1.SubsetOrConsumer
+	Subset riskifiedv1alpha1.Subset
+}

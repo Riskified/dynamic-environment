@@ -3,7 +3,6 @@ processor:
   ignoreTypes:
     - "DynamicEnvList$"
     - "Condition$"
-    - "SubsetType$"
   # RE2 regular expressions describing type fields that should be excluded from the generated documentation.
   ignoreFields:
     - "TypeMeta$"

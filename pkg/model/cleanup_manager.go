@@ -30,7 +30,7 @@ type CleanupManager struct {
 type SubsetsAndConsumersMap = map[string]riskifiedv1alpha1.SubsetOrConsumer
 
 // Checks for subsets and consumers that should be removed because of spec update.
-func (cm *CleanupManager) CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers []riskifiedv1alpha1.SubsetType) SubsetsAndConsumersMap {
+func (cm *CleanupManager) CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers []SubsetType) SubsetsAndConsumersMap {
 	var allSubsetsAndConsumers = make(map[string]riskifiedv1alpha1.SubsetOrConsumer)
 	for _, st := range subsetsAndConsumers {
 		subsetName := helpers.MKSubsetName(st.Subset)
