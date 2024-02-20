@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/handlers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"io"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -71,7 +72,7 @@ var _ = Describe("DestinationRuleHandler", func() {
 						Status:    riskifiedv1alpha1.Missing,
 					},
 				}
-				result, err := handler.GetStatus()
+				result, err := handler.GetStatus(context.Background())
 				Expect(err).To(BeNil())
 				Expect(result).To(Equal(expected))
 			})
@@ -97,14 +98,13 @@ var _ = Describe("DestinationRuleHandler", func() {
 					UniqueName:   "unique",
 					Namespace:    "ns",
 					ServiceHosts: []string{"details", "service2"},
-					StatusHandler: &handlers.DynamicEnvStatusHandler{
+					StatusManager: &model.StatusManager{
 						Client:     mc,
-						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},
 					},
 					Log: ctrl.Log,
 				}
-				err := handler.Handle()
+				err := handler.Handle(context.Background())
 				Expect(err).To(BeNil())
 			})
 
@@ -125,14 +125,13 @@ var _ = Describe("DestinationRuleHandler", func() {
 					UniqueName:   "unique",
 					Namespace:    "ns",
 					ServiceHosts: []string{"service1", "service2"},
-					StatusHandler: &handlers.DynamicEnvStatusHandler{
+					StatusManager: &model.StatusManager{
 						Client:     mc,
-						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},
 					},
 					Log: ctrl.Log,
 				}
-				err := handler.Handle()
+				err := handler.Handle(context.Background())
 				Expect(err).NotTo(BeNil())
 				Expect(err.Error()).To(ContainSubstring("no base destination rules"))
 			})

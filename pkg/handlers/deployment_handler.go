@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/riskified/dynamic-environment/pkg/model"
 
 	"github.com/riskified/dynamic-environment/extensions"
 
@@ -45,18 +46,18 @@ type DeploymentHandler struct {
 	UniqueVersion string
 	// The name of the subset/consumer as it appears in the Status map
 	SubsetName string
-	// THe owner of the deployment we need to handle (e.g. to configure watches)
+	// THe owner of the deployment we need to handle (e.g., to configure watches)
 	Owner types.NamespacedName
 	// The deployment we should use as base
 	BaseDeployment *appsv1.Deployment
-	// Is it a consumer or subset
+	// Is it a Consumer or Subset
 	DeploymentType riskifiedv1alpha1.SubsetOrConsumer
 	// A list of labels to be removed from the overriding deployment
 	LabelsToRemove []string
 	// The version label to use
 	VersionLabel string
 	// Status handler (to be able to update status)
-	StatusHandler *DynamicEnvStatusHandler
+	StatusManager *model.StatusManager
 	// The DynamicEnv matchers
 	Matches []riskifiedv1alpha1.IstioMatch
 	// An indicator whether the current deployment is updating (as opposed to initializing).
@@ -64,17 +65,44 @@ type DeploymentHandler struct {
 	// The subset that contains the data of our deployment
 	Subset riskifiedv1alpha1.Subset
 	Log    logr.Logger
-	Ctx    context.Context
+}
+
+// Initializes DeploymentHandler with provided and default values
+func NewDeploymentHandler(
+	subsetData model.DynamicEnvReconcileData,
+	client client.Client,
+	dt riskifiedv1alpha1.SubsetOrConsumer,
+	labelsToRemove []string,
+	versionLabel string,
+) *DeploymentHandler {
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
+	return &DeploymentHandler{
+		Client:         client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		Owner:          subsetData.Identifier,
+		BaseDeployment: subsetData.BaseDeployment,
+		DeploymentType: dt,
+		LabelsToRemove: labelsToRemove,
+		VersionLabel:   versionLabel,
+		StatusManager:  subsetData.StatusManager,
+		Matches:        subsetData.Matches,
+		Updating:       false,
+		Subset:         subsetData.Subset,
+		Log:            helpers.MkLogger("DeploymentHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
+	}
 }
 
 // Handles creation and manipulation of related Deployments.
-func (h *DeploymentHandler) Handle() error {
+func (h *DeploymentHandler) Handle(ctx context.Context) error {
 	subset := h.Subset
 	sDeployment := &appsv1.Deployment{}
 	searchName := types.NamespacedName{Name: h.UniqueName, Namespace: subset.Namespace}
-	err := h.Get(h.Ctx, searchName, sDeployment)
+	err := h.Get(ctx, searchName, sDeployment)
 	if err != nil && errors.IsNotFound(err) {
-		if err := h.setStatus(riskifiedv1alpha1.Initializing); err != nil {
+		if err := h.setStatus(ctx, riskifiedv1alpha1.Initializing); err != nil {
 			return fmt.Errorf("failed to update status (prior to adding deployment: %s): %w", h.UniqueName, err)
 		}
 		sDeployment, err2 := h.createOverridingDeployment()
@@ -82,7 +110,7 @@ func (h *DeploymentHandler) Handle() error {
 			return err2
 		}
 		h.Log.Info("Deploying newly created overriding deployment", "namespace", subset.Namespace, "name", subset.Name)
-		err2 = h.Create(h.Ctx, sDeployment)
+		err2 = h.Create(ctx, sDeployment)
 		if err2 != nil {
 			h.Log.Error(err, "Error deploying", "namespace", subset.Namespace, "name", subset.Name)
 			return err2
@@ -91,7 +119,7 @@ func (h *DeploymentHandler) Handle() error {
 		if err != nil {
 			return fmt.Errorf("calculating hash for %q: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(ctx, h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash on deployment creation %q: %w", h.UniqueName, err)
 		}
 
@@ -100,10 +128,10 @@ func (h *DeploymentHandler) Handle() error {
 		h.Log.Error(err, "Failed to get matching deployment for subset")
 		return err
 	}
-	return h.UpdateIfRequired()
+	return h.UpdateIfRequired(ctx)
 }
 
-func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error) {
+func (h *DeploymentHandler) GetStatus(ctx context.Context) (riskifiedv1alpha1.ResourceStatus, error) {
 
 	genStatus := func(s riskifiedv1alpha1.LifeCycleStatus) riskifiedv1alpha1.ResourceStatus {
 		return riskifiedv1alpha1.ResourceStatus{
@@ -115,7 +143,7 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 
 	deployment := &appsv1.Deployment{}
 	searchName := types.NamespacedName{Name: h.UniqueName, Namespace: h.Subset.Namespace}
-	if err := h.Get(h.Ctx, searchName, deployment); err != nil {
+	if err := h.Get(ctx, searchName, deployment); err != nil {
 		if errors.IsNotFound(err) {
 			return genStatus(riskifiedv1alpha1.Missing), nil
 		} else {
@@ -147,22 +175,22 @@ func (h *DeploymentHandler) GetStatus() (riskifiedv1alpha1.ResourceStatus, error
 	}
 }
 
-func (h *DeploymentHandler) ApplyStatus(rs riskifiedv1alpha1.ResourceStatus) error {
-	return h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, rs, h.DeploymentType)
+func (h *DeploymentHandler) ApplyStatus(ctx context.Context, rs riskifiedv1alpha1.ResourceStatus) error {
+	return h.StatusManager.AddDeploymentStatusEntry(ctx, h.SubsetName, rs, h.DeploymentType)
 }
 
 func (h *DeploymentHandler) GetSubset() string {
 	return h.SubsetName
 }
 
-func (h *DeploymentHandler) UpdateIfRequired() error {
+func (h *DeploymentHandler) UpdateIfRequired(ctx context.Context) error {
 	h.Log.V(1).Info("Checking whether it's required to update subset", "subset namespace", h.Subset.Namespace, "subset name", h.Subset.Name)
 	s := h.Subset
 	var existingHash uint64
 	if h.DeploymentType == riskifiedv1alpha1.CONSUMER {
-		existingHash = h.StatusHandler.GetHashForConsumer(h.SubsetName)
+		existingHash = h.StatusManager.GetHashForConsumer(h.SubsetName)
 	} else {
-		existingHash = h.StatusHandler.GetHashForSubset(h.SubsetName)
+		existingHash = h.StatusManager.GetHashForSubset(h.SubsetName)
 	}
 	hash, err := hashstructure.Hash(h.Subset, hashstructure.FormatV2, nil)
 	if err != nil {
@@ -175,14 +203,14 @@ func (h *DeploymentHandler) UpdateIfRequired() error {
 		if err != nil {
 			return err
 		}
-		if err := h.setStatus(riskifiedv1alpha1.Updating); err != nil {
+		if err := h.setStatus(ctx, riskifiedv1alpha1.Updating); err != nil {
 			return fmt.Errorf("failed to update status (prior to update deployment: %s): %w", h.UniqueName, err)
 		}
-		if err := h.Update(h.Ctx, newDeployment); err != nil {
+		if err := h.Update(ctx, newDeployment); err != nil {
 			h.Log.Error(err, "Updating Subset", "subset full name", h.UniqueName)
 			return fmt.Errorf("error updating subset %s: %w", h.UniqueName, err)
 		}
-		if err := h.StatusHandler.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(ctx, h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash for '%s': %w", h.UniqueName, err)
 		}
 	}
@@ -253,13 +281,13 @@ func (h *DeploymentHandler) createOverridingDeployment() (*appsv1.Deployment, er
 	return dep, nil
 }
 
-func (h *DeploymentHandler) setStatus(status riskifiedv1alpha1.LifeCycleStatus) error {
+func (h *DeploymentHandler) setStatus(ctx context.Context, status riskifiedv1alpha1.LifeCycleStatus) error {
 	currentState := riskifiedv1alpha1.ResourceStatus{
 		Name:      h.UniqueName,
 		Namespace: h.Subset.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusHandler.AddDeploymentStatusEntry(h.SubsetName, currentState, h.DeploymentType); err != nil {
+	if err := h.StatusManager.AddDeploymentStatusEntry(ctx, h.SubsetName, currentState, h.DeploymentType); err != nil {
 		return err
 	}
 	return nil
@@ -283,12 +311,6 @@ func createContainerTemplate(containers []v1.Container, containerOverrides riski
 
 // Returns the container with the specified name. Fails if not found
 func findContainerIndex(containers *[]v1.Container, defaultName string) (int, error) {
-	if len(*containers) < 1 {
-		// Todo: How do we need to treat this situation? Is it even possible to have empty container list?
-		//goland:noinspection GoErrorStringFormat
-		return 0, fmt.Errorf("how did we get empty container list?")
-	}
-
 	for idx, c := range *containers {
 		if c.Name == defaultName {
 			return idx, nil

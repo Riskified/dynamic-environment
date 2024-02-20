@@ -19,6 +19,7 @@ package helpers
 import (
 	"crypto/sha256"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
 	"strings"
 
@@ -73,9 +74,9 @@ func Shorten(msg string, length int) string {
 	}
 }
 
-func UniqueDynamicEnvName(de *riskifiedv1alpha1.DynamicEnv) string {
-	name := de.Name
-	ns := de.Namespace
+func UniqueDynamicEnvName(id types.NamespacedName) string {
+	name := id.Name
+	ns := id.Namespace
 	if len(name) > 40 {
 		name = name[:40]
 	}
@@ -120,4 +121,17 @@ func CommonValueExists(l1, l2 []string) bool {
 		}
 	}
 	return false
+}
+
+// Just a convention to name subsets
+func MKSubsetName(subset riskifiedv1alpha1.Subset) string {
+	return fmt.Sprintf("%s/%s", subset.Namespace, subset.Name)
+}
+
+func MkResourceName(id types.NamespacedName) string {
+	return fmt.Sprintf("%s/%s", id.Namespace, id.Name)
+}
+
+func MkSubsetUniqueName(name, version string) string {
+	return name + "-" + version
 }

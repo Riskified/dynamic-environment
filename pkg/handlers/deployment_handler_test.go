@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/riskified/dynamic-environment/pkg/helpers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"io"
 	"os"
@@ -84,7 +85,7 @@ var _ = Describe("DeploymentHandler", func() {
 				}
 				handler := mkDeploymentHandler("unique", "my-namespace", mc)
 				expected := mkExpected(handler, riskifiedv1alpha1.Missing)
-				result, _ := handler.GetStatus()
+				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
 
@@ -107,7 +108,7 @@ var _ = Describe("DeploymentHandler", func() {
 				}
 				handler := mkDeploymentHandler("unique", "my-namespace", mc)
 				expected := mkExpected(handler, riskifiedv1alpha1.Running)
-				result, _ := handler.GetStatus()
+				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
 
@@ -126,7 +127,7 @@ var _ = Describe("DeploymentHandler", func() {
 				}
 				handler := mkDeploymentHandler("unique", "my-namespace", mc)
 				expected := mkExpected(handler, riskifiedv1alpha1.Initializing)
-				result, _ := handler.GetStatus()
+				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
 		})
@@ -154,7 +155,7 @@ var _ = Describe("DeploymentHandler", func() {
 				}
 				handler := mkDeploymentHandler("unavailable1", "my-namespace", mc)
 				expected := mkExpected(handler, riskifiedv1alpha1.Initializing)
-				result, _ := handler.GetStatus()
+				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
 
@@ -172,11 +173,9 @@ var _ = Describe("DeploymentHandler", func() {
 				}
 				handler := mkDeploymentHandler("unique", "my-namespace", mc)
 				expected := mkExpected(handler, riskifiedv1alpha1.Failed)
-				result, _ := handler.GetStatus()
+				result, _ := handler.GetStatus(context.Background())
 				Expect(result).To(Equal(expected))
 			})
-
-			// TODO: Do we need to test of ReplicaFailure condition?
 		})
 	})
 
@@ -187,9 +186,8 @@ var _ = Describe("DeploymentHandler", func() {
 				Client:       c,
 				UniqueName:   uniqueName,
 				VersionLabel: names.DefaultVersionLabel,
-				StatusHandler: &handlers.DynamicEnvStatusHandler{
+				StatusManager: &model.StatusManager{
 					Client:     c,
-					Ctx:        nil,
 					DynamicEnv: &de,
 				},
 				Log: ctrl.Log,
@@ -206,7 +204,7 @@ var _ = Describe("DeploymentHandler", func() {
 			handler.SubsetName = fmt.Sprintf("%s/%s", de.Spec.Subsets[0].Namespace, de.Spec.Subsets[0].Name)
 			subset := de.Spec.Subsets[0].DeepCopy()
 			handler.Subset = *subset
-			errorResult := handler.UpdateIfRequired()
+			errorResult := handler.UpdateIfRequired(context.Background())
 			Expect(errorResult).To(BeNil())
 			Expect(handler.Updating).To(BeFalse())
 		})

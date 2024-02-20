@@ -1,4 +1,3 @@
-# TODO: find a way to verify that the DynamicEnv Status object does not contain removed subsets/consumers.
 ---
 apiVersion: apps/v1
 kind: Deployment

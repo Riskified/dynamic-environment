@@ -26,6 +26,7 @@ import (
 	"github.com/go-logr/logr"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/helpers"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"github.com/riskified/dynamic-environment/pkg/watches"
 	istioapi "istio.io/api/networking/v1alpha3"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -36,6 +37,7 @@ import (
 // A handler for managing VirtualService manipulations.
 type VirtualServiceHandler struct {
 	client.Client
+	Identifier    types.NamespacedName
 	UniqueName    string
 	UniqueVersion string
 	Namespace     string
@@ -44,27 +46,51 @@ type VirtualServiceHandler struct {
 	RoutePrefix    string
 	ServiceHosts   []string
 	DefaultVersion string
-	DynamicEnv     *riskifiedv1alpha1.DynamicEnv
-	StatusHandler  *DynamicEnvStatusHandler
+	Matches        []riskifiedv1alpha1.IstioMatch
+	StatusManager  *model.StatusManager
 	Log            logr.Logger
-	Ctx            context.Context
 
 	activeHosts     []string
 	virtualServices map[string][]types.NamespacedName
 }
 
+// Initializes VirtualServiceHandler with provided and default values
+func NewVirtualServiceHandler(
+	subsetData model.DynamicEnvReconcileData,
+	serviceHosts []string,
+	defaultVersion string,
+	client client.Client,
+) *VirtualServiceHandler {
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
+	return &VirtualServiceHandler{
+		Client:         client,
+		Identifier:     subsetData.Identifier,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		Namespace:      subsetData.Subset.Namespace,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		RoutePrefix:    helpers.CalculateVirtualServicePrefix(uniqueVersion, subsetData.Subset.Name),
+		ServiceHosts:   serviceHosts,
+		DefaultVersion: defaultVersion,
+		Matches:        subsetData.Matches,
+		StatusManager:  subsetData.StatusManager,
+		Log:            helpers.MkLogger("VirtualServiceHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
+	}
+}
+
 // Fetches related Virtual Services and manipulates them accordingly.
-func (h *VirtualServiceHandler) Handle() error {
+func (h *VirtualServiceHandler) Handle(ctx context.Context) error {
 	h.virtualServices = make(map[string][]types.NamespacedName)
 	for _, serviceHost := range h.ServiceHosts {
-		services, err := h.locateVirtualServicesByServiceHost(serviceHost)
+		services, err := h.locateVirtualServicesByServiceHost(ctx, serviceHost)
 		if err != nil {
 			return err
 		}
 		h.virtualServices[serviceHost] = toNamespacedName(services)
 		var atLeastOneVirtualServicePerHostnameExists = false
 		for _, service := range services {
-			if err := h.updateVirtualService(service, serviceHost); err != nil {
+			if err := h.updateVirtualService(ctx, service, serviceHost); err != nil {
 				h.Log.Info("error updating virtual service", "service-host", serviceHost, "error", err.Error())
 				continue
 			}
@@ -81,7 +107,7 @@ func (h *VirtualServiceHandler) Handle() error {
 	return nil
 }
 
-func (h *VirtualServiceHandler) GetStatus() ([]riskifiedv1alpha1.ResourceStatus, error) {
+func (h *VirtualServiceHandler) GetStatus(ctx context.Context) ([]riskifiedv1alpha1.ResourceStatus, error) {
 	var services []*istionetwork.VirtualService
 	var statuses []riskifiedv1alpha1.ResourceStatus
 	for _, serviceHost := range h.ServiceHosts {
@@ -89,7 +115,7 @@ func (h *VirtualServiceHandler) GetStatus() ([]riskifiedv1alpha1.ResourceStatus,
 		if ok {
 			for _, nn := range s {
 				found := &istionetwork.VirtualService{}
-				if err := h.Get(h.Ctx, nn, found); err != nil {
+				if err := h.Get(ctx, nn, found); err != nil {
 					h.Log.Error(err, "Fetching virtual service for status", "name", nn)
 					return nil, fmt.Errorf("fetching virtual service for status: %w", err)
 				}
@@ -105,9 +131,9 @@ func (h *VirtualServiceHandler) GetStatus() ([]riskifiedv1alpha1.ResourceStatus,
 	return statuses, nil
 }
 
-func (h *VirtualServiceHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
+func (h *VirtualServiceHandler) ApplyStatus(ctx context.Context, statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.SubsetName, rs); err != nil {
+		if err := h.StatusManager.AddVirtualServiceStatusEntry(ctx, h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -122,10 +148,10 @@ func (h *VirtualServiceHandler) GetHosts() []string {
 	return h.activeHosts
 }
 
-func (h *VirtualServiceHandler) locateVirtualServicesByServiceHost(serviceHost string) ([]*istionetwork.VirtualService, error) {
+func (h *VirtualServiceHandler) locateVirtualServicesByServiceHost(ctx context.Context, serviceHost string) ([]*istionetwork.VirtualService, error) {
 	virtualServices := istionetwork.VirtualServiceList{}
 	var result []*istionetwork.VirtualService
-	if err := h.List(h.Ctx, &virtualServices); err != nil {
+	if err := h.List(ctx, &virtualServices); err != nil {
 		return nil, fmt.Errorf("error locating virtual services for app host '%s': %w", h.ServiceHosts, err)
 	}
 	for idx, service := range virtualServices.Items {
@@ -136,7 +162,7 @@ func (h *VirtualServiceHandler) locateVirtualServicesByServiceHost(serviceHost s
 					result = append(result, virtualServices.Items[idx])
 				}
 				for _, d := range delegated {
-					found, err := h.extractServiceFromDelegate(d, virtualServices)
+					found, err := h.extractServiceFromDelegate(ctx, d, virtualServices)
 					if err != nil {
 						return result, err
 					}
@@ -167,24 +193,24 @@ func (h *VirtualServiceHandler) resolveVirtualServices(serviceHost string, servi
 	return useSelf, delegated
 }
 
-func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.Delegate, services istionetwork.VirtualServiceList) (*istionetwork.VirtualService, error) {
+func (h *VirtualServiceHandler) extractServiceFromDelegate(ctx context.Context, delegate *istioapi.Delegate, services istionetwork.VirtualServiceList) (*istionetwork.VirtualService, error) {
 	for _, s := range services.Items {
 		if delegate.Name == s.Name && delegate.Namespace == s.Namespace {
 			return s, nil
 		}
 	}
 	msg := fmt.Sprintf("Wierd, Couldn't find a service with name: %s, namespace: %s, in the service list", delegate.Name, delegate.Namespace)
-	if err := h.StatusHandler.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
+	if err := h.StatusManager.AddGlobalVirtualServiceError(ctx, h.SubsetName, msg); err != nil {
 		h.Log.Error(err, "failed to write the following message to status: "+msg)
 	}
 	h.Log.Info(msg)
 	s := &istionetwork.VirtualService{}
 	searchName := types.NamespacedName{Name: delegate.Name, Namespace: delegate.Namespace}
-	if err := h.Client.Get(h.Ctx, searchName, s); err != nil {
+	if err := h.Client.Get(ctx, searchName, s); err != nil {
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("Delegate (%s/%s) not found", delegate.Namespace, delegate.Name)
 			h.Log.V(0).Info(msg)
-			if err = h.StatusHandler.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
+			if err = h.StatusManager.AddGlobalVirtualServiceError(ctx, h.SubsetName, msg); err != nil {
 				h.Log.Error(err, "Error writing virtual service status regarding delegate", "delegate", delegate)
 				if !errors.IsConflict(err) {
 					return nil, fmt.Errorf("failed to write global virtual service error: %w", err)
@@ -198,9 +224,8 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(delegate *istioapi.De
 	return s, nil
 }
 
-func (h *VirtualServiceHandler) updateVirtualService(service *istionetwork.VirtualService, serviceHost string) error {
+func (h *VirtualServiceHandler) updateVirtualService(ctx context.Context, service *istionetwork.VirtualService, serviceHost string) error {
 	h.Log.Info("Updating virtual service to route to version", "virtual-service", service.Name, "version", h.UniqueVersion)
-	owner := types.NamespacedName{Name: h.DynamicEnv.Name, Namespace: h.DynamicEnv.Namespace}
 	prefix := h.RoutePrefix
 
 	// TODO: This is currently a shortcoming. We'll see whether there's a need to enable that (a single virtual service
@@ -211,7 +236,7 @@ func (h *VirtualServiceHandler) updateVirtualService(service *istionetwork.Virtu
 	}
 
 	newStatus := riskifiedv1alpha1.ResourceStatus{Name: service.Name, Namespace: service.Namespace}
-	if err := h.StatusHandler.AddVirtualServiceStatusEntry(h.SubsetName, newStatus); err != nil {
+	if err := h.StatusManager.AddVirtualServiceStatusEntry(ctx, h.SubsetName, newStatus); err != nil {
 		h.Log.Error(err, "error updating state for virtual service")
 		return err
 	}
@@ -223,7 +248,7 @@ func (h *VirtualServiceHandler) updateVirtualService(service *istionetwork.Virtu
 			continue
 		}
 		if h.routeDestinationsMatchesServiceHost(serviceHost, r.Route, service.Namespace) {
-			for _, match := range h.DynamicEnv.Spec.IstioMatches {
+			for _, match := range h.Matches {
 				ourSubsetRoute := r.DeepCopy()
 				if err := h.populateRouteWithSubsetData(ourSubsetRoute, serviceHost, match, service.Namespace); err != nil {
 					h.Log.Error(err, "Adopting rule for dynamic environment")
@@ -236,8 +261,8 @@ func (h *VirtualServiceHandler) updateVirtualService(service *istionetwork.Virtu
 	}
 
 	service.Spec.Http = newRoutes
-	watches.AddToAnnotation(owner, service)
-	if err := h.Update(h.Ctx, service); err != nil {
+	watches.AddToAnnotation(h.Identifier, service)
+	if err := h.Update(ctx, service); err != nil {
 		h.Log.Error(err, "Error updating VirtualService with our updated rules")
 		return err
 	}
@@ -308,7 +333,7 @@ func (h *VirtualServiceHandler) populateRouteWithSubsetData(route *istioapi.HTTP
 	return nil
 }
 
-// A helper to checks whether any of the provided routes are already populated with DynamicEnv data.
+// A helper to check whether any of the provided routes are already populated with DynamicEnv data.
 func routesConfiguredWithDynamicEnvRoutes(routes []*istioapi.HTTPRoute, prefix string) bool {
 	for _, r := range routes {
 		if strings.HasPrefix(r.Name, prefix) {
@@ -319,7 +344,7 @@ func routesConfiguredWithDynamicEnvRoutes(routes []*istioapi.HTTPRoute, prefix s
 }
 
 // A helper to check if any of the provided route-destinations has a serviceHost and namespace matching the provided
-// ones. The `inNamespace` parameter is the namespace to search if the `host` parameter is not fully qualified (e.g. the
+// ones. The `inNamespace` parameter is the namespace to search if the `host` parameter is not fully qualified (e.g., the
 // namespace of the virtual service).
 func (h *VirtualServiceHandler) routeDestinationsMatchesServiceHost(serviceHost string, routes []*istioapi.HTTPRouteDestination, inNamespace string) bool {
 	for _, route := range routes {
@@ -331,7 +356,7 @@ func (h *VirtualServiceHandler) routeDestinationsMatchesServiceHost(serviceHost 
 	return false
 }
 
-// Select only the route-destinations that matches the provided hostname and namespace.
+// Select only the route-destinations that match the provided hostname and namespace.
 // Note: the `inNamespace` parameter is the namespace to search for if the destination is not fully qualified (e.g.the
 // namespace which contains the virtual service we're processing).
 func (h *VirtualServiceHandler) filterRouteDestinationByHost(destinations []*istioapi.HTTPRouteDestination, serviceHost string, inNamespace string) []*istioapi.HTTPRouteDestination {

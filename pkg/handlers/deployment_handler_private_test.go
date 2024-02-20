@@ -16,10 +16,9 @@ limitations under the License.
 
 package handlers
 
-// IMPORTANT: While it's generally bad practice to test private functions, I do it here in order to
-// avoid overly specified tests from the outside. If these test fails (e.g. we changed
-// implementation) just delete the failing tests (of-course, make sure you test the new
-// functionality :) ).
+// IMPORTANT: While it's generally bad practice to test private functions, I do it here to avoid overly specified tests
+// from the outside. If these tests fail (e.g., we changed implementation) delete the failing tests (make sure you test
+// the new functionality :) ).
 
 import (
 	"encoding/json"
@@ -98,12 +97,11 @@ var _ = Describe("Accepting alternative version label", func() {
 			BaseDeployment: &deployment,
 			DeploymentType: 0,
 			VersionLabel:   versionLabel,
-			StatusHandler:  nil,
+			StatusManager:  nil,
 			Matches:        nil,
 			Updating:       false,
 			Subset:         riskifiedv1alpha1.Subset{},
 			Log:            logr.Logger{},
-			Ctx:            nil,
 		}
 		result, err := h.createOverridingDeployment()
 		Expect(err).To(BeNil())
@@ -180,12 +178,11 @@ var _ = Describe("Removing apecific labels from deployment", func() {
 			DeploymentType: 0,
 			LabelsToRemove: []string{},
 			VersionLabel:   "version-label",
-			StatusHandler:  nil,
+			StatusManager:  nil,
 			Matches:        nil,
 			Updating:       false,
 			Subset:         riskifiedv1alpha1.Subset{},
 			Log:            logr.Logger{},
-			Ctx:            nil,
 		}
 	}
 

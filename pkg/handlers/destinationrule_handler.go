@@ -20,6 +20,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"github.com/riskified/dynamic-environment/pkg/model"
 	"k8s.io/utils/strings/slices"
 
 	"github.com/go-logr/logr"
@@ -50,27 +51,50 @@ type DestinationRuleHandler struct {
 	// The version that gets the default route
 	DefaultVersion string
 	// Status handler (to be able to update status)
-	StatusHandler *DynamicEnvStatusHandler
+	StatusManager *model.StatusManager
 	// The host name of the service that points to the Deployment specified in
 	// the subset.
 	ServiceHosts []string
 	// The name/namespace of the DynamicEnv that launches this DestinationRule
 	Owner types.NamespacedName
 	Log   logr.Logger
-	Ctx   context.Context
 
 	ignoredMissing []string
 	activeHosts    []string
 }
 
+func NewDestinationRuleHandler(
+	subsetData model.DynamicEnvReconcileData,
+	versionLabel,
+	defaultVersion string,
+	serviceHosts []string,
+	client client.Client,
+) *DestinationRuleHandler {
+	uniqueVersion := helpers.UniqueDynamicEnvName(subsetData.Identifier)
+	uniqueName := helpers.MkSubsetUniqueName(subsetData.Subset.Name, uniqueVersion)
+	return &DestinationRuleHandler{
+		Client:         client,
+		UniqueName:     uniqueName,
+		UniqueVersion:  uniqueVersion,
+		Namespace:      subsetData.Subset.Namespace,
+		SubsetName:     helpers.MKSubsetName(subsetData.Subset),
+		VersionLabel:   versionLabel,
+		DefaultVersion: defaultVersion,
+		StatusManager:  subsetData.StatusManager,
+		ServiceHosts:   serviceHosts,
+		Owner:          subsetData.Identifier,
+		Log:            helpers.MkLogger("DestinationRuleHandler", "resource", helpers.MkResourceName(subsetData.Identifier)),
+	}
+}
+
 // Handles creation and manipulation of related DestinationRules.
-func (h *DestinationRuleHandler) Handle() error {
+func (h *DestinationRuleHandler) Handle(ctx context.Context) error {
 	for _, serviceHost := range h.ServiceHosts {
 		found := &istionetwork.DestinationRule{}
 		drName := h.calculateDRName(serviceHost)
-		if err := h.Get(h.Ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
+		if err := h.Get(ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
 			if errors.IsNotFound(err) {
-				if err := h.createMissingDestinationRule(drName, serviceHost); err != nil {
+				if err := h.createMissingDestinationRule(ctx, drName, serviceHost); err != nil {
 					return fmt.Errorf("creating destination rule for '%s': %w", serviceHost, err)
 				}
 				continue
@@ -90,7 +114,7 @@ func (h *DestinationRuleHandler) Handle() error {
 
 // GetStatus here can only return missing or running is there is no real status
 // for DestinationRule, just whether it exists or missing.
-func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.ResourceStatus, err error) {
+func (h *DestinationRuleHandler) GetStatus(ctx context.Context) (statuses []riskifiedv1alpha1.ResourceStatus, err error) {
 
 	genStatus := func(name string, s riskifiedv1alpha1.LifeCycleStatus) riskifiedv1alpha1.ResourceStatus {
 		return riskifiedv1alpha1.ResourceStatus{
@@ -103,7 +127,7 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 	for _, sh := range h.ServiceHosts {
 		found := &istionetwork.DestinationRule{}
 		drName := h.calculateDRName(sh)
-		if err := h.Get(h.Ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
+		if err := h.Get(ctx, types.NamespacedName{Name: drName, Namespace: h.Namespace}, found); err != nil {
 			if errors.IsNotFound(err) {
 				if slices.Contains(h.ignoredMissing, sh) {
 					statuses = append(statuses, genStatus(drName, riskifiedv1alpha1.IgnoredMissingDR))
@@ -120,9 +144,9 @@ func (h *DestinationRuleHandler) GetStatus() (statuses []riskifiedv1alpha1.Resou
 	return statuses, nil
 }
 
-func (h *DestinationRuleHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
+func (h *DestinationRuleHandler) ApplyStatus(ctx context.Context, statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusHandler.AddDestinationRuleStatusEntry(h.SubsetName, rs); err != nil {
+		if err := h.StatusManager.AddDestinationRuleStatusEntry(ctx, h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -137,11 +161,11 @@ func (h *DestinationRuleHandler) GetHosts() []string {
 	return h.activeHosts
 }
 
-func (h *DestinationRuleHandler) createMissingDestinationRule(destinationRuleName, serviceHost string) error {
-	if err := h.setStatus(h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
+func (h *DestinationRuleHandler) createMissingDestinationRule(ctx context.Context, destinationRuleName, serviceHost string) error {
+	if err := h.setStatus(ctx, h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
 		return fmt.Errorf("failed to update status (prior to launching destination rule: %s): %w", serviceHost, err)
 	}
-	newDestinationRule, err := h.generateOverridingDestinationRule(serviceHost)
+	newDestinationRule, err := h.generateOverridingDestinationRule(ctx, serviceHost)
 	if err != nil {
 		if goerrors.As(err, &IgnoredMissing{}) {
 			h.ignoredMissing = append(h.ignoredMissing, serviceHost)
@@ -153,15 +177,15 @@ func (h *DestinationRuleHandler) createMissingDestinationRule(destinationRuleNam
 	}
 	h.Log.Info("Deploying newly created destination rule", "destination rule name", h.UniqueName, "service-host", destinationRuleName)
 	watches.AddToAnnotation(h.Owner, newDestinationRule)
-	if err = h.Create(h.Ctx, newDestinationRule); err != nil {
+	if err = h.Create(ctx, newDestinationRule); err != nil {
 		return fmt.Errorf("error deploying new destination rule version=%q service-host=%q: %w", h.UniqueName, destinationRuleName, err)
 	}
 	h.activeHosts = append(h.activeHosts, serviceHost)
 	return nil
 }
 
-func (h *DestinationRuleHandler) generateOverridingDestinationRule(serviceHost string) (*istionetwork.DestinationRule, error) {
-	originalDestinationRule, err := h.locateDestinationRuleByHostname(serviceHost)
+func (h *DestinationRuleHandler) generateOverridingDestinationRule(ctx context.Context, serviceHost string) (*istionetwork.DestinationRule, error) {
+	originalDestinationRule, err := h.locateDestinationRuleByHostname(ctx, serviceHost)
 	if err != nil {
 		return nil, fmt.Errorf("locating default destination rule for '%s': %w", h.ServiceHosts, err)
 	}
@@ -187,9 +211,9 @@ func (h *DestinationRuleHandler) generateOverridingDestinationRule(serviceHost s
 	return newDestinationRule, nil
 }
 
-func (h *DestinationRuleHandler) locateDestinationRuleByHostname(hostName string) (*istionetwork.DestinationRule, error) {
+func (h *DestinationRuleHandler) locateDestinationRuleByHostname(ctx context.Context, hostName string) (*istionetwork.DestinationRule, error) {
 	destinationRules := &istionetwork.DestinationRuleList{}
-	if err := h.List(h.Ctx, destinationRules, client.InNamespace(h.Namespace)); err != nil {
+	if err := h.List(ctx, destinationRules, client.InNamespace(h.Namespace)); err != nil {
 		return nil, fmt.Errorf("error listing existing destination rules: %w", err)
 	}
 	for _, dr := range destinationRules.Items {
@@ -206,13 +230,13 @@ func (h *DestinationRuleHandler) locateDestinationRuleByHostname(hostName string
 	return nil, IgnoredMissing{}
 }
 
-func (h *DestinationRuleHandler) setStatus(subset, drName string, status riskifiedv1alpha1.LifeCycleStatus) error {
+func (h *DestinationRuleHandler) setStatus(ctx context.Context, subset, drName string, status riskifiedv1alpha1.LifeCycleStatus) error {
 	currentState := riskifiedv1alpha1.ResourceStatus{
 		Name:      drName,
 		Namespace: h.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusHandler.AddDestinationRuleStatusEntry(subset, currentState); err != nil {
+	if err := h.StatusManager.AddDestinationRuleStatusEntry(ctx, subset, currentState); err != nil {
 		return err
 	}
 	return nil

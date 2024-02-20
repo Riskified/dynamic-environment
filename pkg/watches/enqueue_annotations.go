@@ -100,7 +100,6 @@ func AddToAnnotation(owner types.NamespacedName, object client.Object) {
 
 // RemoveFromAnnotation removes current Dynamic environment from `NamespacedNameAnnotation`
 func RemoveFromAnnotation(owner types.NamespacedName, object client.Object) {
-	// Todo: Do we want to delete the annotation entirely if empty?
 	annotations := object.GetAnnotations()
 	if annotations == nil {
 		annotations = map[string]string{}

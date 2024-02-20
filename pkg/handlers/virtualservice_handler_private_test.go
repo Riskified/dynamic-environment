@@ -289,7 +289,7 @@ var _ = Describe("VirtualServiceHandler", func() {
 					Status:    riskifiedv1alpha1.IgnoredMissingVS,
 				},
 			}
-			result, err := handler.GetStatus()
+			result, err := handler.GetStatus(context.Background())
 			Expect(err).To(BeNil())
 			Expect(result).To(Equal(expected))
 		})
@@ -338,7 +338,7 @@ var _ = Describe("VirtualServiceHandler", func() {
 					Status:    riskifiedv1alpha1.Running,
 				},
 			}
-			result, err := handler.GetStatus()
+			result, err := handler.GetStatus(context.Background())
 			Expect(err).To(BeNil())
 			Expect(result).To(Equal(expected))
 		})
