@@ -36,7 +36,7 @@ type SRHandler interface {
 	// update the status, just computes what the current status should be.
 	GetStatus(ctx context.Context) (riskifiedv1alpha1.ResourceStatus, error)
 	// Apply the provided status to the DynamicEnvironment.
-	ApplyStatus(riskifiedv1alpha1.ResourceStatus) error
+	ApplyStatus(context.Context, riskifiedv1alpha1.ResourceStatus) error
 }
 
 // MultiResourceHandler is a spacial kind of Handler as it may affect several resources.
@@ -46,7 +46,7 @@ type MRHandler interface {
 	// anything, just returns the found statuses.
 	GetStatus(ctx context.Context) ([]riskifiedv1alpha1.ResourceStatus, error)
 	// Apply the provided status to the DynamicEnvironment.
-	ApplyStatus([]riskifiedv1alpha1.ResourceStatus) error
+	ApplyStatus(context.Context, []riskifiedv1alpha1.ResourceStatus) error
 	/// GetHosts returns non-missing hosts.
 	GetHosts() []string
 }

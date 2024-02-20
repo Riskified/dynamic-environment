@@ -127,7 +127,6 @@ var _ = Describe("DestinationRuleHandler", func() {
 					ServiceHosts: []string{"service1", "service2"},
 					StatusManager: &model.StatusManager{
 						Client:     mc,
-						Ctx:        context.Background(),
 						DynamicEnv: &riskifiedv1alpha1.DynamicEnv{},
 					},
 					Log: ctrl.Log,

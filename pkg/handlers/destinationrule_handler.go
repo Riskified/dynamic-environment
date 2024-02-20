@@ -144,9 +144,9 @@ func (h *DestinationRuleHandler) GetStatus(ctx context.Context) (statuses []risk
 	return statuses, nil
 }
 
-func (h *DestinationRuleHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
+func (h *DestinationRuleHandler) ApplyStatus(ctx context.Context, statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusManager.AddDestinationRuleStatusEntry(h.SubsetName, rs); err != nil {
+		if err := h.StatusManager.AddDestinationRuleStatusEntry(ctx, h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -162,7 +162,7 @@ func (h *DestinationRuleHandler) GetHosts() []string {
 }
 
 func (h *DestinationRuleHandler) createMissingDestinationRule(ctx context.Context, destinationRuleName, serviceHost string) error {
-	if err := h.setStatus(h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
+	if err := h.setStatus(ctx, h.SubsetName, destinationRuleName, riskifiedv1alpha1.Initializing); err != nil {
 		return fmt.Errorf("failed to update status (prior to launching destination rule: %s): %w", serviceHost, err)
 	}
 	newDestinationRule, err := h.generateOverridingDestinationRule(ctx, serviceHost)
@@ -230,13 +230,13 @@ func (h *DestinationRuleHandler) locateDestinationRuleByHostname(ctx context.Con
 	return nil, IgnoredMissing{}
 }
 
-func (h *DestinationRuleHandler) setStatus(subset, drName string, status riskifiedv1alpha1.LifeCycleStatus) error {
+func (h *DestinationRuleHandler) setStatus(ctx context.Context, subset, drName string, status riskifiedv1alpha1.LifeCycleStatus) error {
 	currentState := riskifiedv1alpha1.ResourceStatus{
 		Name:      drName,
 		Namespace: h.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusManager.AddDestinationRuleStatusEntry(subset, currentState); err != nil {
+	if err := h.StatusManager.AddDestinationRuleStatusEntry(ctx, subset, currentState); err != nil {
 		return err
 	}
 	return nil

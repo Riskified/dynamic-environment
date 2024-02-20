@@ -26,44 +26,43 @@ import (
 // A handler for managing `DynamicEnv` Status.
 type StatusManager struct {
 	client.Client
-	Ctx        context.Context
 	DynamicEnv *riskifiedv1alpha1.DynamicEnv
 }
 
 // Adds (or updates) a status entry to the *Deployments* status section (if not
 // exists).
-func (sm *StatusManager) AddDeploymentStatusEntry(subset string, newStatus riskifiedv1alpha1.ResourceStatus, tpe riskifiedv1alpha1.SubsetOrConsumer) error {
+func (sm *StatusManager) AddDeploymentStatusEntry(ctx context.Context, subset string, newStatus riskifiedv1alpha1.ResourceStatus, tpe riskifiedv1alpha1.SubsetOrConsumer) error {
 	if tpe == riskifiedv1alpha1.CONSUMER {
-		return sm.addConsumerDeploymentStatusEntry(subset, newStatus)
+		return sm.addConsumerDeploymentStatusEntry(ctx, subset, newStatus)
 	}
-	return sm.addSubsetDeploymentStatusEntry(subset, newStatus)
+	return sm.addSubsetDeploymentStatusEntry(ctx, subset, newStatus)
 }
 
 // Add a status entry to the *DestinationRules* status section (if not exists).
-func (sm *StatusManager) AddDestinationRuleStatusEntry(subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
+func (sm *StatusManager) AddDestinationRuleStatusEntry(ctx context.Context, subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
 	currentStatus := sm.safeGetSubsetsStatus(subset)
 	modified, newStatuses := SyncStatusResources(newStatus, currentStatus.DestinationRules)
 	if modified {
 		currentStatus.DestinationRules = newStatuses
 		sm.DynamicEnv.Status.SubsetsStatus[subset] = currentStatus
-		return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+		return sm.Status().Update(ctx, sm.DynamicEnv)
 	}
 	return nil
 }
 
 // Add a status entry to the *VirtualServices* status section (if not exists).
-func (sm *StatusManager) AddVirtualServiceStatusEntry(subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
+func (sm *StatusManager) AddVirtualServiceStatusEntry(ctx context.Context, subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
 	currentStatus := sm.safeGetSubsetsStatus(subset)
 	modified, newStatuses := SyncStatusResources(newStatus, currentStatus.VirtualServices)
 	if modified {
 		currentStatus.VirtualServices = newStatuses
 		sm.DynamicEnv.Status.SubsetsStatus[subset] = currentStatus
-		return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+		return sm.Status().Update(ctx, sm.DynamicEnv)
 	}
 	return nil
 }
 
-func (sm *StatusManager) AddGlobalVirtualServiceError(subset, msg string) error {
+func (sm *StatusManager) AddGlobalVirtualServiceError(ctx context.Context, subset, msg string) error {
 	currentStatus := sm.safeGetSubsetsStatus(subset)
 	statusErrors := SafeGetSubsetErrors(currentStatus)
 	currentErrors := statusErrors.VirtualServices
@@ -71,34 +70,34 @@ func (sm *StatusManager) AddGlobalVirtualServiceError(subset, msg string) error 
 	statusErrors.VirtualServices = currentErrors
 	currentStatus.Errors = &statusErrors
 	sm.DynamicEnv.Status.SubsetsStatus[subset] = currentStatus
-	return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+	return sm.Status().Update(ctx, sm.DynamicEnv)
 }
 
-func (sm *StatusManager) SetGlobalState(state riskifiedv1alpha1.GlobalReadyStatus, totalCount int, notReadyCount int) error {
+func (sm *StatusManager) SetGlobalState(ctx context.Context, state riskifiedv1alpha1.GlobalReadyStatus, totalCount int, notReadyCount int) error {
 	sm.DynamicEnv.Status.State = state
 	sm.DynamicEnv.Status.TotalCount = totalCount
 	sm.DynamicEnv.Status.TotalReady = totalCount - notReadyCount
-	return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+	return sm.Status().Update(ctx, sm.DynamicEnv)
 }
 
-func (sm *StatusManager) addSubsetDeploymentStatusEntry(subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
+func (sm *StatusManager) addSubsetDeploymentStatusEntry(ctx context.Context, subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
 	currentStatus := sm.safeGetSubsetsStatus(subset)
 	if !currentStatus.Deployment.IsEqual(newStatus) {
 		currentStatus.Deployment = newStatus
 		sm.DynamicEnv.Status.SubsetsStatus[subset] = currentStatus
-		return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+		return sm.Status().Update(ctx, sm.DynamicEnv)
 	}
 	return nil
 }
 
-func (sm *StatusManager) addConsumerDeploymentStatusEntry(subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
+func (sm *StatusManager) addConsumerDeploymentStatusEntry(ctx context.Context, subset string, newStatus riskifiedv1alpha1.ResourceStatus) error {
 	currentStatus := sm.safeGetConsumersStatus(subset)
 	if !currentStatus.IsEqual(newStatus) {
 		currentStatus.Name = newStatus.Name
 		currentStatus.Namespace = newStatus.Namespace
 		currentStatus.Status = newStatus.Status
 		sm.DynamicEnv.Status.ConsumersStatus[subset] = currentStatus
-		return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+		return sm.Status().Update(ctx, sm.DynamicEnv)
 	}
 	return nil
 }
@@ -181,11 +180,11 @@ func (sm *StatusManager) GetHashForConsumer(name string) uint64 {
 	return uint64(consumerStatus.Hash)
 }
 
-func (sm *StatusManager) ApplyHash(name string, hash uint64, tpe riskifiedv1alpha1.SubsetOrConsumer) error {
+func (sm *StatusManager) ApplyHash(ctx context.Context, name string, hash uint64, tpe riskifiedv1alpha1.SubsetOrConsumer) error {
 	if tpe == riskifiedv1alpha1.CONSUMER {
-		return sm.setHashForConsumer(name, hash)
+		return sm.setHashForConsumer(ctx, name, hash)
 	} else {
-		return sm.setHashForSubset(name, hash)
+		return sm.setHashForSubset(ctx, name, hash)
 	}
 }
 
@@ -231,17 +230,17 @@ func SyncGlobalErrors(msg string, errors []riskifiedv1alpha1.StatusError) []risk
 	}
 	return result
 }
-func (sm *StatusManager) setHashForSubset(name string, hash uint64) error {
+func (sm *StatusManager) setHashForSubset(ctx context.Context, name string, hash uint64) error {
 	subsetStatus, ok := sm.DynamicEnv.Status.SubsetsStatus[name]
 	if !ok {
 		subsetStatus = riskifiedv1alpha1.SubsetStatus{}
 	}
 	subsetStatus.Hash = int64(hash)
 	sm.DynamicEnv.Status.SubsetsStatus[name] = subsetStatus
-	return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+	return sm.Status().Update(ctx, sm.DynamicEnv)
 }
 
-func (sm *StatusManager) setHashForConsumer(name string, hash uint64) error {
+func (sm *StatusManager) setHashForConsumer(ctx context.Context, name string, hash uint64) error {
 	if sm.DynamicEnv.Status.ConsumersStatus == nil {
 		sm.DynamicEnv.Status.ConsumersStatus = make(map[string]riskifiedv1alpha1.ConsumerStatus)
 	}
@@ -251,5 +250,5 @@ func (sm *StatusManager) setHashForConsumer(name string, hash uint64) error {
 	}
 	consumerStatus.Hash = int64(hash)
 	sm.DynamicEnv.Status.ConsumersStatus[name] = consumerStatus
-	return sm.Status().Update(sm.Ctx, sm.DynamicEnv)
+	return sm.Status().Update(ctx, sm.DynamicEnv)
 }

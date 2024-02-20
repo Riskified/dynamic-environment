@@ -102,7 +102,7 @@ func (h *DeploymentHandler) Handle(ctx context.Context) error {
 	searchName := types.NamespacedName{Name: h.UniqueName, Namespace: subset.Namespace}
 	err := h.Get(ctx, searchName, sDeployment)
 	if err != nil && errors.IsNotFound(err) {
-		if err := h.setStatus(riskifiedv1alpha1.Initializing); err != nil {
+		if err := h.setStatus(ctx, riskifiedv1alpha1.Initializing); err != nil {
 			return fmt.Errorf("failed to update status (prior to adding deployment: %s): %w", h.UniqueName, err)
 		}
 		sDeployment, err2 := h.createOverridingDeployment()
@@ -119,7 +119,7 @@ func (h *DeploymentHandler) Handle(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("calculating hash for %q: %w", h.UniqueName, err)
 		}
-		if err := h.StatusManager.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(ctx, h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash on deployment creation %q: %w", h.UniqueName, err)
 		}
 
@@ -175,8 +175,8 @@ func (h *DeploymentHandler) GetStatus(ctx context.Context) (riskifiedv1alpha1.Re
 	}
 }
 
-func (h *DeploymentHandler) ApplyStatus(rs riskifiedv1alpha1.ResourceStatus) error {
-	return h.StatusManager.AddDeploymentStatusEntry(h.SubsetName, rs, h.DeploymentType)
+func (h *DeploymentHandler) ApplyStatus(ctx context.Context, rs riskifiedv1alpha1.ResourceStatus) error {
+	return h.StatusManager.AddDeploymentStatusEntry(ctx, h.SubsetName, rs, h.DeploymentType)
 }
 
 func (h *DeploymentHandler) GetSubset() string {
@@ -203,14 +203,14 @@ func (h *DeploymentHandler) UpdateIfRequired(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := h.setStatus(riskifiedv1alpha1.Updating); err != nil {
+		if err := h.setStatus(ctx, riskifiedv1alpha1.Updating); err != nil {
 			return fmt.Errorf("failed to update status (prior to update deployment: %s): %w", h.UniqueName, err)
 		}
 		if err := h.Update(ctx, newDeployment); err != nil {
 			h.Log.Error(err, "Updating Subset", "subset full name", h.UniqueName)
 			return fmt.Errorf("error updating subset %s: %w", h.UniqueName, err)
 		}
-		if err := h.StatusManager.ApplyHash(h.SubsetName, hash, h.DeploymentType); err != nil {
+		if err := h.StatusManager.ApplyHash(ctx, h.SubsetName, hash, h.DeploymentType); err != nil {
 			return fmt.Errorf("setting subset hash for '%s': %w", h.UniqueName, err)
 		}
 	}
@@ -281,13 +281,13 @@ func (h *DeploymentHandler) createOverridingDeployment() (*appsv1.Deployment, er
 	return dep, nil
 }
 
-func (h *DeploymentHandler) setStatus(status riskifiedv1alpha1.LifeCycleStatus) error {
+func (h *DeploymentHandler) setStatus(ctx context.Context, status riskifiedv1alpha1.LifeCycleStatus) error {
 	currentState := riskifiedv1alpha1.ResourceStatus{
 		Name:      h.UniqueName,
 		Namespace: h.Subset.Namespace,
 		Status:    status,
 	}
-	if err := h.StatusManager.AddDeploymentStatusEntry(h.SubsetName, currentState, h.DeploymentType); err != nil {
+	if err := h.StatusManager.AddDeploymentStatusEntry(ctx, h.SubsetName, currentState, h.DeploymentType); err != nil {
 		return err
 	}
 	return nil

@@ -109,13 +109,12 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	cleanupManager := model.CleanupManager{
 		Client: r.Client,
-		Ctx:    ctx,
 		Log:    helpers.MkLogger("CleanupManager", "resource", resourceName),
 		DE:     dynamicEnv,
 	}
 
 	if markedForDeletion(dynamicEnv) {
-		return cleanupManager.DeleteAllResources()
+		return cleanupManager.DeleteAllResources(ctx)
 	}
 
 	if err := r.ensureFinalizers(ctx, dynamicEnv); err != nil {
@@ -127,7 +126,6 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	statusManager := model.StatusManager{
 		Client:     r.Client,
-		Ctx:        ctx,
 		DynamicEnv: dynamicEnv,
 	}
 
@@ -137,7 +135,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	var cleanupInProgress bool
 	toRemove := cleanupManager.CheckForRemovedSubsetsAndConsumers(subsetsAndConsumers)
 	if len(toRemove) > 0 {
-		inProgress, err := cleanupManager.RemoveSubsetsAndConsumers(toRemove)
+		inProgress, err := cleanupManager.RemoveSubsetsAndConsumers(ctx, toRemove)
 		if err != nil {
 			cleanupError = err
 		}
@@ -179,7 +177,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	statusManager.SyncSubsetMessagesToStatus(rls.subsetMessages)
 	statusManager.SyncConsumerMessagesToStatus(rls.consumerMessages)
-	if err := statusManager.SetGlobalState(globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
+	if err := statusManager.SetGlobalState(ctx, globalState, len(subsetsAndConsumers), len(rls.nonReadyCS)); err != nil {
 		log.Error(err, "error setting global state", "global-state", globalState, "subsetMessages", rls.subsetMessages)
 		rls.returnError.SetIfNotMasking(err)
 	}
@@ -300,7 +298,7 @@ func (r *DynamicEnvReconciler) processHandlersStatus(ctx context.Context, srhs [
 			continue
 		}
 		log.Info("Handler returned status", "status", newStatus)
-		if err = handler.ApplyStatus(newStatus); err != nil {
+		if err = handler.ApplyStatus(ctx, newStatus); err != nil {
 			log.Error(err, "error updating status", "status", newStatus)
 			returnError.SetIfNotMasking(err)
 			response.msgs[handler.GetSubset()] = append(response.msgs[handler.GetSubset()], fmt.Sprintf("error updating status: %s", err))
@@ -321,7 +319,7 @@ func (r *DynamicEnvReconciler) processHandlersStatus(ctx context.Context, srhs [
 			continue
 		}
 		log.Info("MRHandler returned statuses", "statuses", statuses)
-		if err = handler.ApplyStatus(statuses); err != nil {
+		if err = handler.ApplyStatus(ctx, statuses); err != nil {
 			log.Error(err, "error updating status", "statuses", statuses)
 			msg := fmt.Sprintf("error updating status: %s", err)
 			returnError.SetIfNotMasking(err)

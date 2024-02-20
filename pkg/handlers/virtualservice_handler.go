@@ -131,9 +131,9 @@ func (h *VirtualServiceHandler) GetStatus(ctx context.Context) ([]riskifiedv1alp
 	return statuses, nil
 }
 
-func (h *VirtualServiceHandler) ApplyStatus(statuses []riskifiedv1alpha1.ResourceStatus) error {
+func (h *VirtualServiceHandler) ApplyStatus(ctx context.Context, statuses []riskifiedv1alpha1.ResourceStatus) error {
 	for _, rs := range statuses {
-		if err := h.StatusManager.AddVirtualServiceStatusEntry(h.SubsetName, rs); err != nil {
+		if err := h.StatusManager.AddVirtualServiceStatusEntry(ctx, h.SubsetName, rs); err != nil {
 			return err
 		}
 	}
@@ -200,7 +200,7 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(ctx context.Context, 
 		}
 	}
 	msg := fmt.Sprintf("Wierd, Couldn't find a service with name: %s, namespace: %s, in the service list", delegate.Name, delegate.Namespace)
-	if err := h.StatusManager.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
+	if err := h.StatusManager.AddGlobalVirtualServiceError(ctx, h.SubsetName, msg); err != nil {
 		h.Log.Error(err, "failed to write the following message to status: "+msg)
 	}
 	h.Log.Info(msg)
@@ -210,7 +210,7 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(ctx context.Context, 
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("Delegate (%s/%s) not found", delegate.Namespace, delegate.Name)
 			h.Log.V(0).Info(msg)
-			if err = h.StatusManager.AddGlobalVirtualServiceError(h.SubsetName, msg); err != nil {
+			if err = h.StatusManager.AddGlobalVirtualServiceError(ctx, h.SubsetName, msg); err != nil {
 				h.Log.Error(err, "Error writing virtual service status regarding delegate", "delegate", delegate)
 				if !errors.IsConflict(err) {
 					return nil, fmt.Errorf("failed to write global virtual service error: %w", err)
@@ -236,7 +236,7 @@ func (h *VirtualServiceHandler) updateVirtualService(ctx context.Context, servic
 	}
 
 	newStatus := riskifiedv1alpha1.ResourceStatus{Name: service.Name, Namespace: service.Namespace}
-	if err := h.StatusManager.AddVirtualServiceStatusEntry(h.SubsetName, newStatus); err != nil {
+	if err := h.StatusManager.AddVirtualServiceStatusEntry(ctx, h.SubsetName, newStatus); err != nil {
 		h.Log.Error(err, "error updating state for virtual service")
 		return err
 	}
