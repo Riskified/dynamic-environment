@@ -257,9 +257,9 @@ type ContainerOverrides struct {
 
 // DynamicEnvStatus defines the observed state of DynamicEnv
 type DynamicEnvStatus struct {
-	// Represents the latest available observations of a deployment's current state.
-	Conditions      []Condition               `json:"conditions,omitempty"`
-	SubsetsStatus   map[string]SubsetStatus   `json:"subsetsStatus"`
+	// A detailed status of each subset
+	SubsetsStatus map[string]SubsetStatus `json:"subsetsStatus"`
+	// A detailed status of each consumer
 	ConsumersStatus map[string]ConsumerStatus `json:"consumersStatus,omitempty"`
 	State           GlobalReadyStatus         `json:"state,omitempty"`
 	// desired subsets and consumers count

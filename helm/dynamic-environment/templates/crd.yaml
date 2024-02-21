@@ -552,36 +552,6 @@ spec:
           status:
             description: DynamicEnvStatus defines the observed state of DynamicEnv
             properties:
-              conditions:
-                description: Represents the latest available observations of a deployment's current state.
-                items:
-                  description: Condition describes the state of a DynamicEnv at a certain point.
-                  properties:
-                    lastTransitionTime:
-                      description: Last time the condition transitioned from one status to another.
-                      format: date-time
-                      type: string
-                    lastUpdateTime:
-                      description: The last time this condition was updated.
-                      format: date-time
-                      type: string
-                    message:
-                      description: A human-readable message indicating details about the transition.
-                      type: string
-                    reason:
-                      description: The reason for the condition's last transition.
-                      type: string
-                    status:
-                      description: Status of the condition, one of True, False, Unknown.
-                      type: string
-                    type:
-                      description: Type of condition
-                      type: string
-                  required:
-                  - status
-                  - type
-                  type: object
-                type: array
               consumersStatus:
                 additionalProperties:
                   properties:
@@ -620,6 +590,7 @@ spec:
                   - namespace
                   - status
                   type: object
+                description: A detailed status of each consumer
                 type: object
               state:
                 type: string
@@ -761,6 +732,7 @@ spec:
                         type: object
                       type: array
                   type: object
+                description: A detailed status of each subset
                 type: object
               totalCount:
                 description: desired subsets and consumers count

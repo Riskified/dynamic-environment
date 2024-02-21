@@ -92,8 +92,8 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `subsetsStatus` _object (keys:string, values:[SubsetStatus](#subsetstatus))_ |  |
-| `consumersStatus` _object (keys:string, values:[ConsumerStatus](#consumerstatus))_ |  |
+| `subsetsStatus` _object (keys:string, values:[SubsetStatus](#subsetstatus))_ | A detailed status of each subset |
+| `consumersStatus` _object (keys:string, values:[ConsumerStatus](#consumerstatus))_ | A detailed status of each consumer |
 | `state` _GlobalReadyStatus_ |  |
 | `totalCount` _integer_ | desired subsets and consumers count |
 | `totalReady` _integer_ | number of available subsets and consumers |
