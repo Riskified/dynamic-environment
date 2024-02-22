@@ -71,7 +71,7 @@ func fetchEnvVar(envs []v1.EnvVar, name string) (exists bool, env v1.EnvVar) {
 }
 
 // Calculates the prefix for naming virtual service route name prefix. Note that empty subset
-// produces more inclusive prefix (e.g. everything belongs to this single dynamicenv).
+// produces more inclusive prefix (e.g., everything belongs to this single dynamicenv).
 func CalculateVirtualServicePrefix(version, subset string) string {
 	subsetPart := ""
 	if len(subset) > 0 {

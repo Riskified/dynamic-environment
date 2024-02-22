@@ -46,7 +46,7 @@ const (
 	Ready      GlobalReadyStatus = "ready"
 	Processing GlobalReadyStatus = "processing"
 
-	// Whether it's consumer or subset.
+	// Whether it's a consumer or subset.
 	SUBSET   SubsetOrConsumer = iota
 	CONSUMER SubsetOrConsumer = iota
 )
@@ -179,8 +179,8 @@ type DynamicEnvSpec struct {
 	Subsets []Subset `json:"subsets"`
 
 	// Consumers are like subsets but for deployments that do not open a service but connect to external resources for
-	// their work (e.g, offline workers). They are equivalent to subsets in the sense that they launch overriding
-	// deployments with custom image and/or settings. However, since they are only consumers no virtual service or
+	// their work (e.g., offline workers). They are equivalent to subsets in the sense that they launch overriding
+	// deployments with custom image and/or settings. However, since they are only consumers, no virtual service or
 	// destination route will be pointing to them.
 	Consumers []Subset `json:"consumers,omitempty"`
 }
@@ -207,7 +207,7 @@ type StringMatch struct {
 	Regex  string `json:"regex,omitempty"`
 }
 
-// Subsets defines how to generate subsets from existing Deployments
+// Subsets define how to generate subsets from existing Deployments
 type Subset struct {
 	// Deployment name (without namespace)
 	Name string `json:"name"`
@@ -237,7 +237,7 @@ type Subset struct {
 // and the relevant overrides
 type ContainerOverrides struct {
 	// Container name to override in multiple containers' environment. If not
-	// specified we will use the first container.
+	//  specified, we will use the first container.
 	ContainerName string `json:"containerName"`
 
 	// Docker image name overridden to the desired subset
@@ -277,7 +277,7 @@ type DynamicEnvList struct {
 	Items           []DynamicEnv `json:"items"`
 }
 
-// SubsetStatus Contains aggregation of all resources status connected to set subset.
+// SubsetStatus Contains aggregation of all resource status connected to set subset.
 type SubsetStatus struct {
 	// Status of the deployment that belongs to the subset
 	Deployment ResourceStatus `json:"deployment,omitempty"`
@@ -327,7 +327,8 @@ func (rs ResourceStatus) IsEqual(other ResourceStatus) bool {
 
 // StatusError shows an error we want to display in the status with the last time it happened. This
 // *does not* have to be the only time it happened. The idea is that a list of errors should only
-// contain single occurrence of an error (just the last).
+//
+//	contain a single occurrence of an error (just the last).
 type StatusError struct {
 	// The error message
 	Error string `json:"error"`
@@ -336,7 +337,7 @@ type StatusError struct {
 }
 
 // SubsetMessages contains a list of messages (errors) that occurred during Reconcile loop. At the
-// end of each loop these messages should be synced to the matching subset status.
+// end of each loop, these messages should be synced to the matching subset status.
 type SubsetMessages struct {
 	Deployment      []string
 	DestinationRule []string

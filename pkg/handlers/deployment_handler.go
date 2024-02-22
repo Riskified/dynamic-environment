@@ -50,7 +50,7 @@ type DeploymentHandler struct {
 	Owner types.NamespacedName
 	// The deployment we should use as base
 	BaseDeployment *appsv1.Deployment
-	// Is it a Consumer or Subset
+	// Is it a Consumer or Subset?
 	DeploymentType riskifiedv1alpha1.SubsetOrConsumer
 	// A list of labels to be removed from the overriding deployment
 	LabelsToRemove []string

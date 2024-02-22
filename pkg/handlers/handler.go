@@ -51,7 +51,7 @@ type MRHandler interface {
 	GetHosts() []string
 }
 
-// IgnoredMissing should indicate an acceptable missing resource (e.g. missing DR per hostname)
+// IgnoredMissing should indicate an acceptable missing resource (e.g., missing DR per hostname)
 type IgnoredMissing struct{}
 
 func (im IgnoredMissing) Error() string { return "Ignored Missing Resource" }
