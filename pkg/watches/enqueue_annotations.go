@@ -112,14 +112,3 @@ func RemoveFromAnnotation(owner types.NamespacedName, object client.Object) {
 	annotations[NamespacedNameAnnotation] = strings.Join(existingDynamicEnvs, ",")
 	object.SetAnnotations(annotations)
 }
-
-// ContainsAnnotations checks whether the requested annotation already exists.
-func ContainsAnnotation(searchItem types.NamespacedName, object client.Object) bool {
-	annotations := object.GetAnnotations()
-	if annotations == nil {
-		return false
-	}
-	existingAnnotations := strings.Split(annotations[NamespacedNameAnnotation], ",")
-	searchFor := fmt.Sprintf("%s/%s", searchItem.Namespace, searchItem.Name)
-	return slices.Contains(existingAnnotations, searchFor)
-}

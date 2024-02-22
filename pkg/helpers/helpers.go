@@ -33,18 +33,6 @@ const (
 	KeyValueHeaderConcatinator = "|"
 )
 
-func IsStringSliceEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func RemoveItemFromStringSlice(s string, slc []string) []string {
 	var result []string
 	for _, item := range slc {
@@ -102,15 +90,6 @@ func SerializeIstioMatchExactHeaders(headers map[string]riskifiedv1alpha1.String
 		}
 	}
 	return serialized.String()
-}
-
-func HeadersContainsExactStringMatch(headers map[string]riskifiedv1alpha1.StringMatch) bool {
-	for _, h := range headers {
-		if len(h.Exact) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // Validate intersection between two slices is not empty/
