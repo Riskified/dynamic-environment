@@ -56,12 +56,12 @@ spec:
               consumers:
                 description: Consumers are like subsets but for deployments that do
                   not open a service but connect to external resources for their work
-                  (e.g, offline workers). They are equivalent to subsets in the sense
+                  (e.g., offline workers). They are equivalent to subsets in the sense
                   that they launch overriding deployments with custom image and/or
-                  settings. However, since they are only consumers no virtual service
+                  settings. However, since they are only consumers, no virtual service
                   or destination route will be pointing to them.
                 items:
-                  description: Subsets defines how to generate subsets from existing
+                  description: Subsets define how to generate subsets from existing
                     Deployments
                   properties:
                     containers:
@@ -80,7 +80,7 @@ spec:
                             type: array
                           containerName:
                             description: Container name to override in multiple containers'
-                              environment. If not specified we will use the first
+                              environment. If not specified, we will use the first
                               container.
                             type: string
                           env:
@@ -234,7 +234,7 @@ spec:
                             type: array
                           containerName:
                             description: Container name to override in multiple containers'
-                              environment. If not specified we will use the first
+                              environment. If not specified, we will use the first
                               container.
                             type: string
                           env:
@@ -428,7 +428,7 @@ spec:
               subsets:
                 description: Who should participate in the given dynamic environment
                 items:
-                  description: Subsets defines how to generate subsets from existing
+                  description: Subsets define how to generate subsets from existing
                     Deployments
                   properties:
                     containers:
@@ -447,7 +447,7 @@ spec:
                             type: array
                           containerName:
                             description: Container name to override in multiple containers'
-                              environment. If not specified we will use the first
+                              environment. If not specified, we will use the first
                               container.
                             type: string
                           env:
@@ -601,7 +601,7 @@ spec:
                             type: array
                           containerName:
                             description: Container name to override in multiple containers'
-                              environment. If not specified we will use the first
+                              environment. If not specified, we will use the first
                               container.
                             type: string
                           env:
@@ -770,11 +770,11 @@ spec:
                     errors:
                       description: List of errors related to the consumer
                       items:
-                        description: StatusError shows an error we want to display
+                        description: "StatusError shows an error we want to display
                           in the status with the last time it happened. This *does
                           not* have to be the only time it happened. The idea is that
-                          a list of errors should only contain single occurrence of
-                          an error (just the last).
+                          a list of errors should only \n contain a single occurrence
+                          of an error (just the last)."
                         properties:
                           error:
                             description: The error message
@@ -812,8 +812,8 @@ spec:
                 type: string
               subsetsStatus:
                 additionalProperties:
-                  description: SubsetStatus Contains aggregation of all resources
-                    status connected to set subset.
+                  description: SubsetStatus Contains aggregation of all resource status
+                    connected to set subset.
                   properties:
                     deployment:
                       description: Status of the deployment that belongs to the subset
@@ -864,11 +864,11 @@ spec:
                         deployment:
                           description: Subset's deployment global errors.
                           items:
-                            description: StatusError shows an error we want to display
+                            description: "StatusError shows an error we want to display
                               in the status with the last time it happened. This *does
                               not* have to be the only time it happened. The idea
-                              is that a list of errors should only contain single
-                              occurrence of an error (just the last).
+                              is that a list of errors should only \n contain a single
+                              occurrence of an error (just the last)."
                             properties:
                               error:
                                 description: The error message
@@ -885,11 +885,11 @@ spec:
                         destinationRule:
                           description: Subset's destination-rule global errors.
                           items:
-                            description: StatusError shows an error we want to display
+                            description: "StatusError shows an error we want to display
                               in the status with the last time it happened. This *does
                               not* have to be the only time it happened. The idea
-                              is that a list of errors should only contain single
-                              occurrence of an error (just the last).
+                              is that a list of errors should only \n contain a single
+                              occurrence of an error (just the last)."
                             properties:
                               error:
                                 description: The error message
@@ -907,11 +907,11 @@ spec:
                           description: Errors related to subset but not to any of
                             the launched resources
                           items:
-                            description: StatusError shows an error we want to display
+                            description: "StatusError shows an error we want to display
                               in the status with the last time it happened. This *does
                               not* have to be the only time it happened. The idea
-                              is that a list of errors should only contain single
-                              occurrence of an error (just the last).
+                              is that a list of errors should only \n contain a single
+                              occurrence of an error (just the last)."
                             properties:
                               error:
                                 description: The error message
@@ -928,11 +928,11 @@ spec:
                         virtualServices:
                           description: Subset's virtual-services global errors.
                           items:
-                            description: StatusError shows an error we want to display
+                            description: "StatusError shows an error we want to display
                               in the status with the last time it happened. This *does
                               not* have to be the only time it happened. The idea
-                              is that a list of errors should only contain single
-                              occurrence of an error (just the last).
+                              is that a list of errors should only \n contain a single
+                              occurrence of an error (just the last)."
                             properties:
                               error:
                                 description: The error message

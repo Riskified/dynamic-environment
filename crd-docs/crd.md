@@ -42,7 +42,7 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `containerName` _string_ | Container name to override in multiple containers' environment. If not specified we will use the first container. |
+| `containerName` _string_ | Container name to override in multiple containers' environment. If not specified, we will use the first container. |
 | `image` _string_ | Docker image name overridden to the desired subset The Docker image found in the original deployment is used if this is not provided. |
 | `command` _string array_ | Entrypoint array overridden to the desired subset The docker image's ENTRYPOINT is used if this is not provided. |
 | `env` _[EnvVar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.26/#envvar-v1-core) array_ | Additional environment variable to the given deployment |
@@ -78,7 +78,7 @@ _Appears in:_
 | --- | --- |
 | `istioMatches` _[IstioMatch](#istiomatch) array_ | A list of matchers (partly corresponds to IstioMatch). Each match will have a rule of its own (merged with existing rules) ordered by their order here. |
 | `subsets` _[Subset](#subset) array_ | Who should participate in the given dynamic environment |
-| `consumers` _[Subset](#subset) array_ | Consumers are like subsets but for deployments that do not open a service but connect to external resources for their work (e.g, offline workers). They are equivalent to subsets in the sense that they launch overriding deployments with custom image and/or settings. However, since they are only consumers no virtual service or destination route will be pointing to them. |
+| `consumers` _[Subset](#subset) array_ | Consumers are like subsets but for deployments that do not open a service but connect to external resources for their work (e.g., offline workers). They are equivalent to subsets in the sense that they launch overriding deployments with custom image and/or settings. However, since they are only consumers, no virtual service or destination route will be pointing to them. |
 
 
 #### DynamicEnvStatus
@@ -135,7 +135,8 @@ _Appears in:_
 
 
 
-StatusError shows an error we want to display in the status with the last time it happened. This *does not* have to be the only time it happened. The idea is that a list of errors should only contain single occurrence of an error (just the last).
+StatusError shows an error we want to display in the status with the last time it happened. This *does not* have to be the only time it happened. The idea is that a list of errors should only 
+ contain a single occurrence of an error (just the last).
 
 _Appears in:_
 - [ConsumerStatus](#consumerstatus)
@@ -163,7 +164,7 @@ _Appears in:_
 
 
 
-Subsets defines how to generate subsets from existing Deployments
+Subsets define how to generate subsets from existing Deployments
 
 _Appears in:_
 - [DynamicEnvSpec](#dynamicenvspec)
@@ -202,7 +203,7 @@ _Appears in:_
 
 
 
-SubsetStatus Contains aggregation of all resources status connected to set subset.
+SubsetStatus Contains aggregation of all resource status connected to set subset.
 
 _Appears in:_
 - [DynamicEnvStatus](#dynamicenvstatus)
