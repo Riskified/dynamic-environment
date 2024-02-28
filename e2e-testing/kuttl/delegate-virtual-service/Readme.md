@@ -6,5 +6,5 @@ This test verified integration with delegate virtual service:
 - Test VS across multiple namespaces.
 - Test correct status
 - Test cleanup of virtual *all* virtual services (delegated and direct)
-- Test status errors (produced by missing delegate - we inject a delegated route to missing virtual
+- Test status errors (produced by missing delegate—we inject a delegated route to missing virtual
   service)

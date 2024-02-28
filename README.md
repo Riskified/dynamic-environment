@@ -23,8 +23,8 @@ It effectively deals with the issues mentioned by creating special versions just
 
 This section describes how to create a working environment for developing _Dynamic Environment_.
 While it's not mandatory to follow these instructions or use the same tools, it's highly recommended
-to keep the versions and some install procedures (e.g, _Istio_ installation into kubernetes) to make
-sure everything passes the tests correctly.
+to keep the versions and some installation procedures (e.g., _Istio_ installation into kubernetes)
+to make sure everything passes the tests correctly.
 
 ### Tool Versions
 
@@ -50,7 +50,7 @@ asdf install
 You should now have the right versions of the tools installed. As long as you installed _asdf_
 correctly, and you're running from within the repository root you'll be using the right versions.
 
-Here are other tools, that while not required, can make life easier:
+Here are other tools that while not required, can make life easier:
 
 * `kubectl`: Make sure it's a version that matches our cluster version according to the [version
   skew policy][skew] (if you don't want to mess with multiple versions, and you're using minikube
@@ -80,7 +80,7 @@ similar to the _CI_ as possible).
 We will use [minikube][] as our development cluster. Feel free to use whichever cluster suits you
 best, but try to preserve the kubernetes version.
 
-After installing minikube we need to start a new
+After installing minikube, we need to start a new
 cluster. You can play a little with the _memory_ and the _cpus_ but since we're going to run
 resources on it, it's better to give it more resources than the default:
 
@@ -88,7 +88,7 @@ resources on it, it's better to give it more resources than the default:
 minikube start --kubernetes-version v1.26.3 --memory 8g --cpus 4
 ```
 
-For the rest of the command make sure your _kubectl_ is operating on the minikube context:
+For the rest of the commands, make sure your _kubectl_ is operating on the minikube context:
 
 ```shell
 kubectx -c # should return 'minikube'
@@ -122,7 +122,7 @@ It's better to stop minikube when you're done working for the day_.
 Some tests should run against a dedicated cluster. It is recommended that you'll have a
 default named _Kind_ cluster for testing.
 
-A prerequisite for running _Kind_ is a docker service. Make sure you have one installed (e.g,
+A prerequisite for running _Kind_ is a docker service. Make sure you have one installed (e.g.,
 _Rancher Desktop_). Assuming you followed the instructions above you should have the right version
 of _Kind_ installed.
 
@@ -140,7 +140,7 @@ Install required dependencies and controller docker image:
 
 `
 
-**From now on make sure your k8s context points to the test cluster.**
+**From now on, make sure your k8s context points to the test cluster.**
 
 Deploy the controller to the cluster (this step should be repeated every time you update the
 controller code):
@@ -149,7 +149,7 @@ controller code):
 ./e2e-testing/scripts/setup.sh deploy
 ````
 
-If you want to clean up the test cluster you can run one of the following commands:
+If you want to clean up the test cluster, you can run one of the following commands:
 
 ```shell
 # Undeploy the controller and dependencies
@@ -204,7 +204,7 @@ sure you follow the rules for creating tests:
 
 * Your first test manifest should create a new namespace (preferably named like your test directory)
   and all test resources (deployments, destination rules, virtual services, etc.) should be deployed
-  to that namespace. If required create more than one namespace. This will prevent collisions
+  to that namespace. If required, create more than one namespace. This will prevent collisions
   between test cases.
 * Every namespace added (per the previous step) should contain an _Istio_ namespace:
     ```yaml
@@ -237,7 +237,7 @@ kuttl test --start-kind=false -n default --timeout 20 ./e2e-testing/kuttl --test
 
 While we run default linters during our _test_ stage, it's advisable to occasionally run other
 linters. These should not break the build (and not included in our configuration) and might contain
-a lot of false positives, however you should occasionally run them to manually search for errors:
+a lot of false positives, however, you should occasionally run them to manually search for errors:
 
 ```shell
 # get a list of linters (at the end of the output there are some convenient presets)

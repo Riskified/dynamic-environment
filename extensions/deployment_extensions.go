@@ -32,9 +32,8 @@ type DeploymentExtensionData struct {
 	Subset riskifiedv1alpha1.Subset
 }
 
-// ExtendOverridingDeployment is a function that could be used to customize the overriding
-// deployment. Optionally using the `DeploymentExtensionData` data you can overwrite parts of the
-// `deployment` ref.
+// ExtendOverridingDeployment is a function that could be used to customize the overriding deployment. Optionally, using
+// the `DeploymentExtensionData` data, you can overwrite parts of the `deployment` ref.
 func ExtendOverridingDeployment(deployment *appsv1.Deployment, data DeploymentExtensionData) error {
 
 	return nil

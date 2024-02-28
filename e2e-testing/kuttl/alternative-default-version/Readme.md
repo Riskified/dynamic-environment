@@ -5,7 +5,7 @@ and default values. We do not test for global custom version label (this is only
 global) or global value as it will affect the entire end-to-end testing. We only
 test the option to add specific custom default value per subset.
 
-For validation we:
+For validation, we:
 
 * Validate that a _DestinationRule_ was created for the subset with custom
   default version (_reviews_).

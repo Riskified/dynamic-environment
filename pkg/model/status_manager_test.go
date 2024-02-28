@@ -208,7 +208,7 @@ var _ = Describe("SyncGlobalErrors", func() {
 				result := model.SyncGlobalErrors(msg, current)
 				Expect(result).To(HaveLen(3))
 				_ = findErrorIndex(msg, result)
-				// If last call did not panic than we're ok.
+				// If the last call did not panic than we're ok.
 
 			})
 		})

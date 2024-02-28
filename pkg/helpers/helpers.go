@@ -19,31 +19,10 @@ package helpers
 import (
 	"crypto/sha256"
 	"fmt"
+	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
-	"strings"
-
-	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 )
-
-var log = MkLogger("DynamicEnv")
-
-const (
-	KeyValueHeaderSeparator    = ":"
-	KeyValueHeaderConcatinator = "|"
-)
-
-func IsStringSliceEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
 
 func RemoveItemFromStringSlice(s string, slc []string) []string {
 	var result []string
@@ -84,33 +63,6 @@ func UniqueDynamicEnvName(id types.NamespacedName) string {
 		ns = ns[:20]
 	}
 	return fmt.Sprintf("%s-%s", ns, name)
-}
-
-// This is a temporary hack so we should not care about edge cases:
-//
-//goland:noinspection ALL
-func SerializeIstioMatchExactHeaders(headers map[string]riskifiedv1alpha1.StringMatch) string {
-	var serialized strings.Builder
-	for k, v := range headers {
-		if len(v.Exact) > 0 {
-			if serialized.Len() > 0 {
-				fmt.Fprint(&serialized, KeyValueHeaderConcatinator)
-			}
-			fmt.Fprintf(&serialized, "%s%s%s", k, KeyValueHeaderSeparator, v.Exact)
-		} else {
-			log.V(1).Info("Ignoring non-exact header while serializing match for envoy filters", "ignored-key", k)
-		}
-	}
-	return serialized.String()
-}
-
-func HeadersContainsExactStringMatch(headers map[string]riskifiedv1alpha1.StringMatch) bool {
-	for _, h := range headers {
-		if len(h.Exact) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // Validate intersection between two slices is not empty/

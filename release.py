@@ -7,7 +7,7 @@ DEFAULT_NOTES = 'release-notes.md.tmpl'
 
 class SemanticVersion:
     """
-    A class that handles semantic version. Just instantiate with valid string version.
+    A class that handles semantic version. Instantiate with a valid string version.
     """
 
     def __init__(self, major: int, minor: int, patch: int):

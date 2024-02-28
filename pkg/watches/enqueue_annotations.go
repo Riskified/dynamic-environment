@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	// NamespacedNameAnnotation is an annotation which indicates who the dynamic environment owner of this resource is.
+	// NamespacedNameAnnotation is an annotation that indicates who the dynamic environment owner of this resource is.
 	// The format is `<namespace>/<name>` with comma-separated values if there is more than one dynamic environment
 	NamespacedNameAnnotation = "riskified.com/dynamic-environment"
 )
@@ -40,7 +40,7 @@ type EnqueueRequestForAnnotation struct{}
 
 var _ handler.EventHandler = &EnqueueRequestForAnnotation{}
 
-// Create is called in response to an add event.
+// Create is called in response to an 'add' event.
 func (e *EnqueueRequestForAnnotation) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.Object, q)
 }
@@ -51,7 +51,7 @@ func (e *EnqueueRequestForAnnotation) Update(evt event.UpdateEvent, q workqueue.
 	addToQueue(evt.ObjectOld, q)
 }
 
-// Delete is called in response to a delete event.
+// Delete is called in response to a 'delete' event.
 func (e *EnqueueRequestForAnnotation) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.Object, q)
 }
@@ -61,7 +61,7 @@ func (e *EnqueueRequestForAnnotation) Generic(evt event.GenericEvent, q workqueu
 	addToQueue(evt.Object, q)
 }
 
-// addToQueue converts annotations defined for NamespacedNameAnnotation as comma-separated list and add them to queue.
+// addToQueue converts annotations defined for NamespacedNameAnnotation as a comma-separated list and add them to queue.
 func addToQueue(object client.Object, q workqueue.RateLimitingInterface) {
 	annotations := object.GetAnnotations()
 	if annotations != nil {
@@ -111,15 +111,4 @@ func RemoveFromAnnotation(owner types.NamespacedName, object client.Object) {
 
 	annotations[NamespacedNameAnnotation] = strings.Join(existingDynamicEnvs, ",")
 	object.SetAnnotations(annotations)
-}
-
-// ContainsAnnotations checks whether the requested annotation already exists.
-func ContainsAnnotation(searchItem types.NamespacedName, object client.Object) bool {
-	annotations := object.GetAnnotations()
-	if annotations == nil {
-		return false
-	}
-	existingAnnotations := strings.Split(annotations[NamespacedNameAnnotation], ",")
-	searchFor := fmt.Sprintf("%s/%s", searchItem.Namespace, searchItem.Name)
-	return slices.Contains(existingAnnotations, searchFor)
 }

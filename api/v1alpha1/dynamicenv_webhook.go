@@ -122,7 +122,7 @@ func (de *DynamicEnv) validateIstioMatchAnyOf() error {
 	return nil
 }
 
-// Validates certain aspects of the subset. Should be used both on create and update.
+// Validates certain aspects of the subset. Should be used both on creation and update.
 func (de *DynamicEnv) validateSubsetsProperties() error {
 	subsets := append(de.Spec.Subsets, de.Spec.Consumers...)
 	for _, s := range subsets {
@@ -164,7 +164,7 @@ func (de *DynamicEnv) validateIstioMatchImmutable(old runtime.Object) error {
 }
 
 // validatePartialUpdateSubsets verifies that update only occurs within a subset. The name/namespace
-// of the subsets should not be updated (e.g. should not delete or create new subsets).
+// of the subsets should not be updated (e.g., should not delete or create new subsets).
 func (de *DynamicEnv) validatePartialUpdateSubsets(old runtime.Object) error {
 	oldSubsets := append(old.(*DynamicEnv).Spec.Subsets, old.(*DynamicEnv).Spec.Consumers...)
 	newSubsets := append(de.Spec.Subsets, de.Spec.Consumers...)

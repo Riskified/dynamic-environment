@@ -3,7 +3,7 @@
 This test verifies that when updating *VirtualService* we do not modify routes
 that are pointing to different service then hours (you can see the comments in
 the `01-assert.yaml` file). It then verifies that removing the *DynamicEnv* the
-virtual service return to its original state.
+virtual service returns to its original state.
 
 ### Notes
 
