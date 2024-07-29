@@ -17,10 +17,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
 	"fmt"
 	"k8s.io/utils/strings/slices"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -43,16 +42,16 @@ func (de *DynamicEnv) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 //+kubebuilder:webhook:path=/validate-riskified-com-v1alpha1-dynamicenv,mutating=false,failurePolicy=fail,sideEffects=None,groups=riskified.com,resources=dynamicenvs,verbs=create;update,versions=v1alpha1,name=vdynamicenv.kb.io,admissionReviewVersions=v1
 
-var _ webhook.CustomValidator = &DynamicEnv{}
+var _ webhook.Validator = &DynamicEnv{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (de *DynamicEnv) ValidateCreate() (admission.Warnings, error) {
 	dynamicenvlog.Info("validate create", "name", de.Name)
 
-	if err := de.validateIstioMatchAnyOf(obj); err != nil {
+	if err := de.validateIstioMatchAnyOf(); err != nil {
 		return nil, err
 	}
-	if err := de.validateSubsetsProperties(obj); err != nil {
+	if err := de.validateSubsetsProperties(); err != nil {
 		return nil, err
 	}
 
@@ -60,20 +59,20 @@ func (de *DynamicEnv) ValidateCreate(_ context.Context, obj runtime.Object) (adm
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateUpdate(_ context.Context, old runtime.Object, new runtime.Object) (admission.Warnings, error) {
+func (de *DynamicEnv) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	dynamicenvlog.Info("validate update", "name", de.Name)
 
-	if err := de.validateIstioMatchImmutable(old, new); err != nil {
+	if err := de.validateIstioMatchImmutable(old); err != nil {
 		return nil, err
 	}
-	if err := de.validateSubsetsProperties(new); err != nil {
+	if err := de.validateSubsetsProperties(); err != nil {
 		return nil, err
 	}
-	return nil, de.validatePartialUpdateSubsets(old, new)
+	return nil, de.validatePartialUpdateSubsets(old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+func (de *DynamicEnv) ValidateDelete() (admission.Warnings, error) {
 	dynamicenvlog.Info("validate delete", "name", de.Name)
 
 	return nil, nil
@@ -110,17 +109,14 @@ func (de *DynamicEnv) validateStringMatchOneOf() error {
 }
 
 // validateIstioMatchAnyOf validates at least one field from IstioMatch is defined
-func (de *DynamicEnv) validateIstioMatchAnyOf(obj runtime.Object) error {
+func (de *DynamicEnv) validateIstioMatchAnyOf() error {
 	errDetail := "empty IstioMatch is invalid for DynamicEnv"
-
-	istioMatches := obj.(*DynamicEnv).Spec.IstioMatches
-
-	if len(istioMatches) == 0 {
-		return field.Invalid(field.NewPath("spec"), istioMatches, errDetail)
+	if len(de.Spec.IstioMatches) == 0 {
+		return field.Invalid(field.NewPath("spec"), de.Spec.IstioMatches, errDetail)
 	}
-	for _, match := range istioMatches {
+	for _, match := range de.Spec.IstioMatches {
 		if len(match.Headers) == 0 && len(match.SourceLabels) == 0 {
-			return field.Invalid(field.NewPath("spec"), istioMatches, errDetail)
+			return field.Invalid(field.NewPath("spec"), de.Spec.IstioMatches, errDetail)
 		}
 	}
 
@@ -128,15 +124,12 @@ func (de *DynamicEnv) validateIstioMatchAnyOf(obj runtime.Object) error {
 }
 
 // Validates certain aspects of the subset. Should be used both on creation and update.
-func (de *DynamicEnv) validateSubsetsProperties(obj runtime.Object) error {
-
-	spec := obj.(*DynamicEnv).Spec
-
-	subsets := append(obj.(*DynamicEnv).Spec.Subsets, obj.(*DynamicEnv).Spec.Consumers...)
+func (de *DynamicEnv) validateSubsetsProperties() error {
+	subsets := append(de.Spec.Subsets, de.Spec.Consumers...)
 	for _, s := range subsets {
 		if s.Replicas != nil && *s.Replicas == 0 {
 			msg := "It's illegal to use 0 replicas!"
-			return field.Invalid(field.NewPath("spec"), spec, msg)
+			return field.Invalid(field.NewPath("spec"), de.Spec, msg)
 		}
 		if len(s.Containers) == 0 && len(s.InitContainers) == 0 {
 			msg := "At least a single container or init-container must be specified"
@@ -153,15 +146,15 @@ func (de *DynamicEnv) validateSubsetsProperties(obj runtime.Object) error {
 	}
 	if err := validateNoDuplicateDeployment(subsets); err != nil {
 		msg := "It seems that the following deployment appears in more then one subset/consumer: " + err.Error()
-		return field.Invalid(field.NewPath("spec"), spec, msg)
+		return field.Invalid(field.NewPath("spec"), de.Spec, msg)
 	}
 	return nil
 }
 
 // validateIstioMatchImmutable validates IstioMatch is immutable after creation.
-func (de *DynamicEnv) validateIstioMatchImmutable(old runtime.Object, new runtime.Object) error {
+func (de *DynamicEnv) validateIstioMatchImmutable(old runtime.Object) error {
 	oldIstioMatch := old.(*DynamicEnv).Spec.IstioMatches
-	newIstioMatch := new.(*DynamicEnv).Spec.IstioMatches
+	newIstioMatch := de.Spec.IstioMatches
 
 	if !reflect.DeepEqual(newIstioMatch, oldIstioMatch) {
 		errDetail := "spec.istioMatch field is immutable"
@@ -173,9 +166,9 @@ func (de *DynamicEnv) validateIstioMatchImmutable(old runtime.Object, new runtim
 
 // validatePartialUpdateSubsets verifies that update only occurs within a subset. The name/namespace
 // of the subsets should not be updated (e.g., should not delete or create new subsets).
-func (de *DynamicEnv) validatePartialUpdateSubsets(old runtime.Object, new runtime.Object) error {
+func (de *DynamicEnv) validatePartialUpdateSubsets(old runtime.Object) error {
 	oldSubsets := append(old.(*DynamicEnv).Spec.Subsets, old.(*DynamicEnv).Spec.Consumers...)
-	newSubsets := append(new.(*DynamicEnv).Spec.Subsets, new.(*DynamicEnv).Spec.Consumers...)
+	newSubsets := append(de.Spec.Subsets, de.Spec.Consumers...)
 	for _, subset := range oldSubsets {
 		if err := validateSubsetModifications(subset, newSubsets); err != nil {
 			return err
