@@ -85,7 +85,7 @@ var _ = Describe("Validating Webhook", func() {
 
 		It("Does not allow to update matchers", func() {
 			old := runtime.Object(&base)
-			err := updated.ValidateUpdate(old)
+			_, err := updated.ValidateUpdate(old)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("field is immutable"))
 		})
@@ -148,7 +148,7 @@ var _ = Describe("Validating Webhook", func() {
 
 			for ind, item := range testCases {
 				By(fmt.Sprintf("multi stringMatch %d", ind))
-				err := item.ValidateCreate()
+				_, err := item.ValidateCreate()
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("oneOf"))
 			}
@@ -163,7 +163,7 @@ var _ = Describe("Validating Webhook", func() {
 				},
 				Spec: DynamicEnvSpec{},
 			}
-			err := noMatchDe.ValidateCreate()
+			_, err := noMatchDe.ValidateCreate()
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("empty IstioMatch"))
 		})
@@ -192,7 +192,7 @@ var _ = Describe("Validating Webhook", func() {
 				},
 			}
 
-			err := de.ValidateCreate()
+			_, err := de.ValidateCreate()
 			Expect(err).To(BeNil())
 		})
 
@@ -263,9 +263,9 @@ var _ = Describe("Validating Webhook", func() {
 				},
 			}
 
-			err1 := de1.ValidateCreate()
+			_, err1 := de1.ValidateCreate()
 			Expect(err1).To(BeNil(), "Should accept number of replicas in subsets")
-			err2 := de2.ValidateCreate()
+			_, err2 := de2.ValidateCreate()
 			Expect(err2).To(BeNil(), "Should accept number of replicas in consumers")
 		})
 
@@ -274,7 +274,7 @@ var _ = Describe("Validating Webhook", func() {
 			if err != nil {
 				Fail(err.Error())
 			}
-			resultError := de.ValidateCreate()
+			_, resultError := de.ValidateCreate()
 			Expect(resultError).To(HaveOccurred())
 			Expect(resultError.Error()).To(ContainSubstring("At least a single container or init-container"))
 		})
@@ -284,14 +284,14 @@ var _ = Describe("Validating Webhook", func() {
 			if err != nil {
 				Fail(err.Error())
 			}
-			resultError := de.ValidateCreate()
+			_, resultError := de.ValidateCreate()
 			Expect(resultError).To(HaveOccurred())
 			Expect(resultError.Error()).To(ContainSubstring("names are unique"))
 		})
 
 		DescribeTable("Create rejects invalid subset properties",
 			func(de *DynamicEnv, errMsg string) {
-				err := de.ValidateCreate()
+				_, err := de.ValidateCreate()
 				Expect(err).To(Not(BeNil()))
 				Expect(err.Error()).To(ContainSubstring(errMsg))
 			},
@@ -517,7 +517,7 @@ var _ = Describe("Validating Webhook", func() {
 					},
 				}
 
-				err := de.ValidateCreate()
+				_, err := de.ValidateCreate()
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("Invalid value"))
 			},
@@ -548,7 +548,7 @@ var _ = Describe("Validating Webhook", func() {
 				if err != nil {
 					Fail("Error decoding currentData")
 				}
-				errorResult := current.ValidateUpdate(runtime.Object(&old))
+				_, errorResult := current.ValidateUpdate(runtime.Object(&old))
 				Expect(errorResult).To(BeNil())
 			},
 			Entry(
@@ -579,7 +579,7 @@ var _ = Describe("Validating Webhook", func() {
 				if err != nil {
 					Fail("Error decoding currentData")
 				}
-				errorResult := current.ValidateUpdate(runtime.Object(&old))
+				_, errorResult := current.ValidateUpdate(runtime.Object(&old))
 				Expect(errorResult).To(HaveOccurred())
 				Expect(errorResult.Error()).To(ContainSubstring(partialError))
 			},

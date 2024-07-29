@@ -17,17 +17,17 @@ limitations under the License.
 package watches
 
 import (
+	"context"
 	"fmt"
-	"k8s.io/utils/strings/slices"
-	"strings"
-
 	"github.com/riskified/dynamic-environment/pkg/helpers"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/strings/slices"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 )
 
 const (
@@ -41,23 +41,23 @@ type EnqueueRequestForAnnotation struct{}
 var _ handler.EventHandler = &EnqueueRequestForAnnotation{}
 
 // Create is called in response to an 'add' event.
-func (e *EnqueueRequestForAnnotation) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *EnqueueRequestForAnnotation) Create(_ context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.Object, q)
 }
 
 // Update is called in response to an update event.
-func (e *EnqueueRequestForAnnotation) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *EnqueueRequestForAnnotation) Update(_ context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.ObjectNew, q)
 	addToQueue(evt.ObjectOld, q)
 }
 
 // Delete is called in response to a 'delete' event.
-func (e *EnqueueRequestForAnnotation) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *EnqueueRequestForAnnotation) Delete(_ context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.Object, q)
 }
 
 // GenericFunc is called in response to a generic event.
-func (e *EnqueueRequestForAnnotation) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *EnqueueRequestForAnnotation) Generic(_ context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 	addToQueue(evt.Object, q)
 }
 
