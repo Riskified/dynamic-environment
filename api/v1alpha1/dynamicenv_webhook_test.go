@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,7 +86,9 @@ var _ = Describe("Validating Webhook", func() {
 
 		It("Does not allow to update matchers", func() {
 			old := runtime.Object(&base)
-			err := updated.ValidateUpdate(old)
+			new := runtime.Object(&updated)
+			ctx := context.Background()
+			_, err := updated.ValidateUpdate(ctx, old, new)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("field is immutable"))
 		})
@@ -148,7 +151,10 @@ var _ = Describe("Validating Webhook", func() {
 
 			for ind, item := range testCases {
 				By(fmt.Sprintf("multi stringMatch %d", ind))
-				err := item.ValidateCreate()
+
+				obj := runtime.Object(&item)
+				ctx := context.Background()
+				_, err := item.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("oneOf"))
 			}
@@ -163,7 +169,11 @@ var _ = Describe("Validating Webhook", func() {
 				},
 				Spec: DynamicEnvSpec{},
 			}
-			err := noMatchDe.ValidateCreate()
+
+			obj := runtime.Object(&noMatchDe)
+			ctx := context.Background()
+
+			_, err := noMatchDe.ValidateCreate(ctx, obj)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("empty IstioMatch"))
 		})
@@ -192,7 +202,10 @@ var _ = Describe("Validating Webhook", func() {
 				},
 			}
 
-			err := de.ValidateCreate()
+			obj := runtime.Object(&de)
+			ctx := context.Background()
+
+			_, err := de.ValidateCreate(ctx, obj)
 			Expect(err).To(BeNil())
 		})
 
@@ -263,9 +276,13 @@ var _ = Describe("Validating Webhook", func() {
 				},
 			}
 
-			err1 := de1.ValidateCreate()
+			obj1 := runtime.Object(&de1)
+			ctx := context.Background()
+			obj2 := runtime.Object(&de2)
+
+			_, err1 := de1.ValidateCreate(ctx, obj1)
 			Expect(err1).To(BeNil(), "Should accept number of replicas in subsets")
-			err2 := de2.ValidateCreate()
+			_, err2 := de2.ValidateCreate(ctx, obj2)
 			Expect(err2).To(BeNil(), "Should accept number of replicas in consumers")
 		})
 
@@ -274,7 +291,11 @@ var _ = Describe("Validating Webhook", func() {
 			if err != nil {
 				Fail(err.Error())
 			}
-			resultError := de.ValidateCreate()
+
+			obj := runtime.Object(&de)
+			ctx := context.Background()
+
+			_, resultError := de.ValidateCreate(ctx, obj)
 			Expect(resultError).To(HaveOccurred())
 			Expect(resultError.Error()).To(ContainSubstring("At least a single container or init-container"))
 		})
@@ -284,14 +305,19 @@ var _ = Describe("Validating Webhook", func() {
 			if err != nil {
 				Fail(err.Error())
 			}
-			resultError := de.ValidateCreate()
+
+			obj := runtime.Object(&de)
+			ctx := context.Background()
+			_, resultError := de.ValidateCreate(ctx, obj)
 			Expect(resultError).To(HaveOccurred())
 			Expect(resultError.Error()).To(ContainSubstring("names are unique"))
 		})
 
 		DescribeTable("Create rejects invalid subset properties",
 			func(de *DynamicEnv, errMsg string) {
-				err := de.ValidateCreate()
+				obj := runtime.Object(de)
+				ctx := context.Background()
+				_, err := de.ValidateCreate(ctx, obj)
 				Expect(err).To(Not(BeNil()))
 				Expect(err.Error()).To(ContainSubstring(errMsg))
 			},
@@ -517,7 +543,10 @@ var _ = Describe("Validating Webhook", func() {
 					},
 				}
 
-				err := de.ValidateCreate()
+				obj := runtime.Object(&de)
+				ctx := context.Background()
+
+				_, err := de.ValidateCreate(ctx, obj)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("Invalid value"))
 			},
@@ -541,6 +570,7 @@ var _ = Describe("Validating Webhook", func() {
 			"Allowed modifications",
 			func(oldData, currentData string) {
 				old, err := mkDynamicEnvFromYamlFile(oldData)
+				ctx := context.Background()
 				if err != nil {
 					Fail("Error decoding oldData: " + err.Error())
 				}
@@ -548,7 +578,7 @@ var _ = Describe("Validating Webhook", func() {
 				if err != nil {
 					Fail("Error decoding currentData")
 				}
-				errorResult := current.ValidateUpdate(runtime.Object(&old))
+				_, errorResult := current.ValidateUpdate(ctx, runtime.Object(&old), runtime.Object(&current))
 				Expect(errorResult).To(BeNil())
 			},
 			Entry(
@@ -572,6 +602,8 @@ var _ = Describe("Validating Webhook", func() {
 			"Disallowed modifications",
 			func(oldData, currentData, partialError string) {
 				old, err := mkDynamicEnvFromYamlFile(oldData)
+
+				ctx := context.Background()
 				if err != nil {
 					Fail("Error decoding oldData: " + err.Error())
 				}
@@ -579,7 +611,7 @@ var _ = Describe("Validating Webhook", func() {
 				if err != nil {
 					Fail("Error decoding currentData")
 				}
-				errorResult := current.ValidateUpdate(runtime.Object(&old))
+				_, errorResult := current.ValidateUpdate(ctx, runtime.Object(&old), runtime.Object(&current))
 				Expect(errorResult).To(HaveOccurred())
 				Expect(errorResult.Error()).To(ContainSubstring(partialError))
 			},

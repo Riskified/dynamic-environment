@@ -1,7 +1,7 @@
-golang 1.19.13
+golang 1.21.5
 act 0.2.26
 kuttl 0.15.0
-operator-sdk 1.32.0
+operator-sdk 1.33.0
 kind 0.18.0
 istioctl 1.17.2
 golangci-lint 1.53.2
