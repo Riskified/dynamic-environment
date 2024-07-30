@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/riskified/dynamic-environment/internal/controller"
 	"github.com/riskified/dynamic-environment/pkg/metrics"
 	"github.com/riskified/dynamic-environment/pkg/names"
 	"os"
@@ -39,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
-	"github.com/riskified/dynamic-environment/controllers"
 	// "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	//+kubebuilder:scaffold:imports
 )
@@ -124,7 +124,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.DynamicEnvReconciler{
+	if err = (&controller.DynamicEnvReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		VersionLabel:   versionLabel,

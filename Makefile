@@ -117,11 +117,11 @@ lint: ## Run various linters
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager main.go
+	go build -o bin/manager cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	ENABLE_WEBHOOKS=false go run ./main.go -zap-devel
+	ENABLE_WEBHOOKS=false go run ./cmd/main.go -zap-devel
 
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
