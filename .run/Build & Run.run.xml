@@ -7,9 +7,9 @@
       <env name="ENABLE_WEBHOOKS" value="false" />
     </envs>
     <kind value="FILE" />
-    <package value="$PROJECT_DIR$/main.go" />
+    <package value="$PROJECT_DIR$/cmd/main.go" />
     <directory value="$PROJECT_DIR$" />
-    <filePath value="$PROJECT_DIR$/main.go" />
+    <filePath value="$PROJECT_DIR$/cmd/main.go" />
     <method v="2" />
   </configuration>
 </component>
