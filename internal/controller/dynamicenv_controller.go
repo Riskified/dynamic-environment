@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -36,7 +36,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sort"
 )
 
@@ -381,9 +380,9 @@ func (r *DynamicEnvReconciler) ensureFinalizers(ctx context.Context, de *riskifi
 func (r *DynamicEnvReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&riskifiedv1alpha1.DynamicEnv{}).
-		Watches(&source.Kind{Type: &appsv1.Deployment{}}, &watches.EnqueueRequestForAnnotation{}).
-		Watches(&source.Kind{Type: &istionetwork.DestinationRule{}}, &watches.EnqueueRequestForAnnotation{}).
-		Watches(&source.Kind{Type: &istionetwork.VirtualService{}}, &watches.EnqueueRequestForAnnotation{}).
+		Watches(&appsv1.Deployment{}, &watches.EnqueueRequestForAnnotation{}).
+		Watches(&istionetwork.DestinationRule{}, &watches.EnqueueRequestForAnnotation{}).
+		Watches(&istionetwork.VirtualService{}, &watches.EnqueueRequestForAnnotation{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }

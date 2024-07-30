@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"k8s.io/utils/strings/slices"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,37 +45,37 @@ func (de *DynamicEnv) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &DynamicEnv{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateCreate() error {
+func (de *DynamicEnv) ValidateCreate() (admission.Warnings, error) {
 	dynamicenvlog.Info("validate create", "name", de.Name)
 
 	if err := de.validateIstioMatchAnyOf(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := de.validateSubsetsProperties(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return de.validateStringMatchOneOf()
+	return nil, de.validateStringMatchOneOf()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateUpdate(old runtime.Object) error {
+func (de *DynamicEnv) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	dynamicenvlog.Info("validate update", "name", de.Name)
 
 	if err := de.validateIstioMatchImmutable(old); err != nil {
-		return err
+		return nil, err
 	}
 	if err := de.validateSubsetsProperties(); err != nil {
-		return err
+		return nil, err
 	}
-	return de.validatePartialUpdateSubsets(old)
+	return nil, de.validatePartialUpdateSubsets(old)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (de *DynamicEnv) ValidateDelete() error {
+func (de *DynamicEnv) ValidateDelete() (admission.Warnings, error) {
 	dynamicenvlog.Info("validate delete", "name", de.Name)
 
-	return nil
+	return nil, nil
 }
 
 // validateStringMatchOneOf must validate one and only one schema (oneOf) of StringMatch is defined
