@@ -206,7 +206,7 @@ func (h *VirtualServiceHandler) extractServiceFromDelegate(ctx context.Context, 
 	h.Log.Info(msg)
 	s := &istionetwork.VirtualService{}
 	searchName := types.NamespacedName{Name: delegate.Name, Namespace: delegate.Namespace}
-	if err := h.Client.Get(ctx, searchName, s); err != nil {
+	if err := h.Get(ctx, searchName, s); err != nil {
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("Delegate (%s/%s) not found", delegate.Namespace, delegate.Name)
 			h.Log.V(0).Info(msg)

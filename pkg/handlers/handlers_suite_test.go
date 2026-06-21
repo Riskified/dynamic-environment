@@ -60,6 +60,6 @@ type MockStatus struct {
 	client.SubResourceWriter
 }
 
-func (_ MockStatus) Update(_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption) error {
+func (MockStatus) Update(_ context.Context, _ client.Object, _ ...client.SubResourceUpdateOption) error {
 	return nil
 }

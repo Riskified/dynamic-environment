@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+
 	"github.com/riskified/dynamic-environment/pkg/model"
 
 	"github.com/riskified/dynamic-environment/extensions"
@@ -232,10 +233,10 @@ func (h *DeploymentHandler) createOverridingDeployment() (*appsv1.Deployment, er
 	}
 	*newSpec.Replicas = replicas
 	template := newSpec.Template
-	template.ObjectMeta.Labels[h.VersionLabel] = h.UniqueVersion
-	template.ObjectMeta.Labels[names.DynamicEnvLabel] = "true"
+	template.Labels[h.VersionLabel] = h.UniqueVersion
+	template.Labels[names.DynamicEnvLabel] = "true"
 	for k, v := range h.Subset.PodLabels {
-		template.ObjectMeta.Labels[k] = v
+		template.Labels[k] = v
 	}
 
 	// Main container overrides
@@ -271,6 +272,7 @@ func (h *DeploymentHandler) createOverridingDeployment() (*appsv1.Deployment, er
 		BaseDeployment: h.BaseDeployment,
 		Matches:        h.Matches,
 		Subset:         h.Subset,
+		DynamicEnvName: h.Owner.Name,
 	}
 
 	if err := extensions.ExtendOverridingDeployment(dep, depData); err != nil {

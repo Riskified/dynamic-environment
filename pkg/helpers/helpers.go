@@ -19,6 +19,7 @@ package helpers
 import (
 	"crypto/sha256"
 	"fmt"
+
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/strings/slices"
@@ -39,7 +40,7 @@ func RemoveItemFromStringSlice(s string, slc []string) []string {
 // https://blog.8bitzen.com/posts/22-08-2019-how-to-hash-a-struct-in-go
 func AsSha256(o interface{}) string {
 	h := sha256.New()
-	h.Write([]byte(fmt.Sprintf("%v", o)))
+	_, _ = fmt.Fprintf(h, "%v", o)
 
 	return fmt.Sprintf("%x", h.Sum(nil))
 }

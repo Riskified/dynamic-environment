@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sort"
+
 	"github.com/go-logr/logr"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/handlers"
@@ -36,7 +38,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sort"
 )
 
 var log = helpers.MkLogger("DynamicEnvReconciler")
@@ -92,7 +93,7 @@ func (r *DynamicEnvReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log.V(1).Info("Entered Reconcile Loop")
 
 	dynamicEnv := &riskifiedv1alpha1.DynamicEnv{}
-	err := r.Client.Get(ctx, req.NamespacedName, dynamicEnv)
+	err := r.Get(ctx, req.NamespacedName, dynamicEnv)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("DynamicEnv resource not found. Ignoring since object must be deleted")
@@ -245,7 +246,7 @@ func (r *DynamicEnvReconciler) processSubsetsAndConsumers(
 		}
 
 		if st.Type == riskifiedv1alpha1.SUBSET {
-			serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, baseDeployment.Spec.Template.ObjectMeta.Labels)
+			serviceHosts, err := r.locateMatchingServiceHostnames(ctx, s.Namespace, baseDeployment.Spec.Template.Labels)
 			if err != nil {
 				msg := fmt.Sprintf("locating service hostname for deployment '%s'", baseDeployment.Name)
 				rls.returnError.ForceError(fmt.Errorf("%s: %w", msg, err))
@@ -367,8 +368,8 @@ func (r *DynamicEnvReconciler) locateMatchingServiceHostnames(ctx context.Contex
 }
 
 func (r *DynamicEnvReconciler) ensureFinalizers(ctx context.Context, de *riskifiedv1alpha1.DynamicEnv) error {
-	if len(de.ObjectMeta.Finalizers) == 0 {
-		de.ObjectMeta.Finalizers = []string{names.DeleteDeployments, names.DeleteDestinationRules, names.CleanupVirtualServices}
+	if len(de.Finalizers) == 0 {
+		de.Finalizers = []string{names.DeleteDeployments, names.DeleteDestinationRules, names.CleanupVirtualServices}
 		if err := r.Update(ctx, de); err != nil {
 			return fmt.Errorf("could not update finalizers: %w", err)
 		}
