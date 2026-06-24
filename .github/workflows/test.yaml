@@ -15,15 +15,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install asdf & tools
-        uses: asdf-vm/actions/install@v2
+      - name: add to PATH
+        run: |
+          mkdir -p ${HOME}/bin
+          echo "${HOME}/bin" >> "$GITHUB_PATH"
+          echo "${HOME}/.asdf/shims" >> "$GITHUB_PATH"
+      # This duplicated ugliness will be removed once we'll switch to mise
+      - name: Install asdf
+        run: |
+          cd /tmp/
+          wget https://github.com/asdf-vm/asdf/releases/download/v0.19.0/asdf-v0.19.0-linux-amd64.tar.gz
+          tar xzf asdf-v0.19.0-linux-amd64.tar.gz
+          install asdf "${HOME}/bin/"
+      - name: Install tools
+        run: |
+          echo "Installing all ASDF plugins ..."
+          for tool in `cat .tool-versions |cut -d" " -f1`; do asdf plugin add $tool; done
+          echo "Installing ASDF tools ..."
+          asdf install
+          echo "Finished instlling ASDF tools"
       - run: make test lint
   pre-merge-tasks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install asdf & tools
-        uses: asdf-vm/actions/install@v2
+      - name: add to PATH
+        run: |
+          mkdir -p ${HOME}/bin
+          echo "${HOME}/bin" >> "$GITHUB_PATH"
+          echo "${HOME}/.asdf/shims" >> "$GITHUB_PATH"
+      # This duplicated ugliness will be removed once we'll switch to mise
+      - name: Install asdf
+        run: |
+          cd /tmp/
+          wget https://github.com/asdf-vm/asdf/releases/download/v0.19.0/asdf-v0.19.0-linux-amd64.tar.gz
+          tar xzf asdf-v0.19.0-linux-amd64.tar.gz
+          install asdf "${HOME}/bin/"
+      - name: Install tools
+        run: |
+          echo "Installing all ASDF plugins ..."
+          for tool in `cat .tool-versions |cut -d" " -f1`; do asdf plugin add $tool; done
+          echo "Installing ASDF tools ..."
+          asdf install
+          echo "Finished instlling ASDF tools"
       - name: Verify pre-merge tasks are committed.
         run: |
           make prepare

@@ -1,1 +1,2 @@
-KIND_CUSTOM_IMAGE=kindest/node:v1.26.3
+KIND_CUSTOM_IMAGE=kindest/node:v1.35.0
+KIND_VERSION=0.31.0

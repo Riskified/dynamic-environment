@@ -3,16 +3,23 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   kuttl:
     strategy:
+      fail-fast: false
       matrix:
         versions:
+          # K8s 1.35 (latest) with Istio 1.24
           - kind_image: "kindest/node:v1.35.0"
             istio: "1.24.0"
+          # K8s 1.29 with Istio 1.20
           - kind_image: "kindest/node:v1.29.0"
             istio: "1.20.0"
+          # K8s 1.25.3 with Istio 1.16.2
           - kind_image: "kindest/node:v1.25.3"
             istio: "1.16.2"
     uses: ./.github/workflows/kuttl_workflow.yaml

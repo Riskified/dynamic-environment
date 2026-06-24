@@ -25,18 +25,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	riskifiedv1alpha1 "github.com/riskified/dynamic-environment/api/v1alpha1"
 	"github.com/riskified/dynamic-environment/pkg/helpers"
-	"istio.io/api/networking/v1alpha3"
+	istioapi "istio.io/api/networking/v1alpha3"
 	istionetwork "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	istioapi "istio.io/api/networking/v1alpha3"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -255,11 +254,11 @@ var _ = Describe("VirtualServiceHandler", func() {
 					t.Name = "service"
 					t.Namespace = "ns"
 					t.Spec.Hosts = []string{serviceName}
-					t.Spec.Http = []*v1alpha3.HTTPRoute{
+					t.Spec.Http = []*istioapi.HTTPRoute{
 						{
-							Route: []*v1alpha3.HTTPRouteDestination{
+							Route: []*istioapi.HTTPRouteDestination{
 								{
-									Destination: &v1alpha3.Destination{
+									Destination: &istioapi.Destination{
 										Host:   serviceName,
 										Subset: "shared",
 									},
@@ -305,12 +304,12 @@ var _ = Describe("VirtualServiceHandler", func() {
 					t.Name = "service"
 					t.Namespace = "ns"
 					t.Spec.Hosts = []string{serviceName}
-					t.Spec.Http = []*v1alpha3.HTTPRoute{
+					t.Spec.Http = []*istioapi.HTTPRoute{
 						{
 							Name: prefix + "abscdsdlkfj",
-							Route: []*v1alpha3.HTTPRouteDestination{
+							Route: []*istioapi.HTTPRouteDestination{
 								{
-									Destination: &v1alpha3.Destination{
+									Destination: &istioapi.Destination{
 										Host:   serviceName,
 										Subset: "shared",
 									},

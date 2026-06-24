@@ -30,6 +30,8 @@ type DeploymentExtensionData struct {
 	Matches []riskifiedv1alpha1.IstioMatch
 	// The subset that contains the data of our deployment
 	Subset riskifiedv1alpha1.Subset
+	// DynamicEnv name
+	DynamicEnvName string
 }
 
 // ExtendOverridingDeployment is a function that could be used to customize the overriding deployment. Optionally, using
