@@ -3,6 +3,6 @@ act 0.2.26
 kuttl 0.18.0
 operator-sdk 1.38.0
 kind 0.31.0
-istioctl 1.24.0
+istioctl 1.29.1
 golangci-lint 2.8.0
 yq 4.40.5
